@@ -9,7 +9,7 @@ python-docx
 pytesseract
 Pillow
 pymupdf
-motor
-bson
 aiohttp
+httpx
+groq
 jinja2
