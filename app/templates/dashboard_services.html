@@ -1,0 +1,261 @@
+{% extends "dashboard_base.html" %}
+
+{% block page_title %}Services{% endblock %}
+
+{% block dashboard_content %}
+<div class="services-header">
+    <p style="color: var(--text-muted); font-size: 1rem;">Upload documents and leverage AI to extract intelligence.</p>
+</div>
+
+<div class="dash-services-grid">
+    <!-- Smart Summary -->
+    <div class="dash-service-card">
+        <div class="dsc-header">
+            <div class="dsc-icon" style="background: rgba(99, 102, 241, 0.15);">📄</div>
+            <div>
+                <h3>Smart Summary</h3>
+                <span class="dsc-tag">AI Summarization</span>
+            </div>
+        </div>
+        <p>Deeply analyze documents and extract core insights. Supports PDF, DOCX, and images.</p>
+        <form class="dsc-form" onsubmit="handleService(event, '/summarize', 'Document Summary')">
+            <div class="form-group">
+                <label>Upload Document</label>
+                <input type="file" name="document" onchange="showPreview(event, 'dp-sm')" required>
+            </div>
+            <div id="dp-sm" class="preview-box"></div>
+            <div class="form-group">
+                <label>Context Prompt <span style="color: var(--text-muted); font-weight:400;">(optional)</span></label>
+                <input type="text" name="prompt" placeholder="e.g., Focus on financial risks">
+            </div>
+            <div class="form-group">
+                <label>Analysis Depth</label>
+                <select name="length">
+                    <option value="short">Brief</option>
+                    <option value="medium" selected>Standard</option>
+                    <option value="detailed">Executive Detailed</option>
+                </select>
+            </div>
+            <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Process Now</button>
+        </form>
+    </div>
+
+    <!-- Vendor Matrix -->
+    <div class="dash-service-card">
+        <div class="dsc-header">
+            <div class="dsc-icon" style="background: rgba(251, 191, 36, 0.15);">⚖️</div>
+            <div>
+                <h3>Vendor Matrix</h3>
+                <span class="dsc-tag">Comparison Analysis</span>
+            </div>
+        </div>
+        <p>Automate side-by-side comparison of quotations and vendor proposals.</p>
+        <form class="dsc-form" onsubmit="handleService(event, '/compare-quotations', 'Vendor Comparison')">
+            <div class="form-group">
+                <label>Upload Proposals</label>
+                <input type="file" name="documents" multiple onchange="showPreview(event, 'dp-comp')" required>
+            </div>
+            <div id="dp-comp" class="preview-box"></div>
+            <div class="form-group">
+                <label>Evaluation Criteria</label>
+                <input type="text" name="criteria" placeholder="e.g., pricing, delivery, SLA">
+            </div>
+            <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Generate Matrix</button>
+        </form>
+    </div>
+
+    <!-- Deep Parse -->
+    <div class="dash-service-card">
+        <div class="dsc-header">
+            <div class="dsc-icon" style="background: rgba(34, 197, 94, 0.15);">🔍</div>
+            <div>
+                <h3>Deep Parse</h3>
+                <span class="dsc-tag">Data Extraction</span>
+            </div>
+        </div>
+        <p>Convert unstructured OCR text and documents into clean, structured data tables.</p>
+        <form class="dsc-form" onsubmit="handleService(event, '/extract', 'Structured Data')">
+            <div class="form-group">
+                <label>Input Document</label>
+                <input type="file" name="document" onchange="showPreview(event, 'dp-ext')" required>
+            </div>
+            <div id="dp-ext" class="preview-box"></div>
+            <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Extract Data</button>
+        </form>
+    </div>
+
+    <!-- RFP Forge -->
+    <div class="dash-service-card">
+        <div class="dsc-header">
+            <div class="dsc-icon" style="background: rgba(236, 72, 153, 0.15);">📝</div>
+            <div>
+                <h3>RFP Forge</h3>
+                <span class="dsc-tag">Document Generation</span>
+            </div>
+        </div>
+        <p>Generate high-quality Request for Proposals based on your business requirements.</p>
+        <form class="dsc-form" onsubmit="handleJsonService(event, '/rfp/create', 'RFP Draft')">
+            <div class="form-group">
+                <label>Project Name</label>
+                <input type="text" id="rfp-title" placeholder="Project title" required>
+            </div>
+            <div class="form-group">
+                <label>Organization</label>
+                <input type="text" id="rfp-org" placeholder="Organization name" required>
+            </div>
+            <div class="form-group">
+                <label>Deadline</label>
+                <input type="date" id="rfp-deadline" required>
+            </div>
+            <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Forge RFP</button>
+        </form>
+    </div>
+
+    <!-- RFP Insight -->
+    <div class="dash-service-card">
+        <div class="dsc-header">
+            <div class="dsc-icon" style="background: rgba(14, 165, 233, 0.15);">📈</div>
+            <div>
+                <h3>RFP Insight</h3>
+                <span class="dsc-tag">RFP Analysis</span>
+            </div>
+        </div>
+        <p>Screen complex RFPs for key requirements, eligibility criteria, and compliance gaps.</p>
+        <form class="dsc-form" onsubmit="handleService(event, '/summarize-rfp', 'RFP Screening Report')">
+            <div class="form-group">
+                <label>RFP Document</label>
+                <input type="file" name="document" onchange="showPreview(event, 'dp-rfp')" required>
+            </div>
+            <div id="dp-rfp" class="preview-box"></div>
+            <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Analyze RFP</button>
+        </form>
+    </div>
+
+    <!-- Invoice Intel -->
+    <div class="dash-service-card">
+        <div class="dsc-header">
+            <div class="dsc-icon" style="background: rgba(234, 179, 8, 0.15);">💰</div>
+            <div>
+                <h3>Invoice Intel</h3>
+                <span class="dsc-tag">Financial Extraction</span>
+            </div>
+        </div>
+        <p>Forensic extraction of invoices: line items, tax IDs, bank details, and payment terms.</p>
+        <form class="dsc-form" onsubmit="handleService(event, '/invoice/extract', 'Invoice Intelligence')">
+            <div class="form-group">
+                <label>Invoice File</label>
+                <input type="file" name="document" onchange="showPreview(event, 'dp-inv')" required>
+            </div>
+            <div id="dp-inv" class="preview-box"></div>
+            <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Audit Invoice</button>
+        </form>
+    </div>
+</div>
+
+<style>
+    .dash-services-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+    }
+
+    .dash-service-card {
+        background: var(--bg-card);
+        border: 1px solid var(--glass-border);
+        border-radius: 16px;
+        padding: 2rem;
+        transition: all 0.3s;
+    }
+
+    .dash-service-card:hover {
+        border-color: rgba(251, 191, 36, 0.3);
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .dsc-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .dsc-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.3rem;
+        flex-shrink: 0;
+    }
+
+    .dsc-header h3 {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--text-main);
+        margin-bottom: 0.25rem;
+    }
+
+    .dsc-tag {
+        font-size: 0.75rem;
+        color: var(--primary);
+        background: rgba(251, 191, 36, 0.1);
+        padding: 0.15rem 0.5rem;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+
+    .dash-service-card>p {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        line-height: 1.6;
+        margin-bottom: 1.5rem;
+    }
+
+    .dsc-form .form-group {
+        margin-bottom: 1rem;
+    }
+
+    .dsc-form label {
+        display: block;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: var(--text-main);
+    }
+
+    .dsc-form input[type="text"],
+    .dsc-form input[type="date"],
+    .dsc-form select {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--glass-border);
+        border-radius: 8px;
+        color: var(--text-main);
+        font-size: 0.9rem;
+    }
+
+    .dsc-form input[type="file"] {
+        width: 100%;
+        padding: 0.75rem;
+        background: rgba(255, 255, 255, 0.03);
+        border: 2px dashed var(--glass-border);
+        border-radius: 8px;
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        cursor: pointer;
+    }
+
+    .dsc-form input[type="file"]:hover {
+        border-color: var(--primary);
+    }
+
+    @media (max-width: 900px) {
+        .dash-services-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}

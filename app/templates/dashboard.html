@@ -1,0 +1,218 @@
+{% extends "dashboard_base.html" %}
+
+{% block page_title %}Overview{% endblock %}
+
+{% block dashboard_content %}
+<!-- Stats Cards -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(251, 191, 36, 0.15); color: #fbbf24;">📄</div>
+        <div class="stat-info">
+            <div class="stat-value">{{ analytics.totalProcessed }}</div>
+            <div class="stat-label">Documents Processed</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(34, 197, 94, 0.15); color: #22c55e;">✅</div>
+        <div class="stat-info">
+            <div class="stat-value">{{ analytics.successCount }}</div>
+            <div class="stat-label">Successful</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(239, 68, 68, 0.15); color: #ef4444;">⚠️</div>
+        <div class="stat-info">
+            <div class="stat-value">{{ analytics.errorCount }}</div>
+            <div class="stat-label">Errors</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(99, 102, 241, 0.15); color: #6366f1;">📊</div>
+        <div class="stat-info">
+            <div class="stat-value">{{ subscription.documentsUsed }}/{{ subscription.documentsLimit }}</div>
+            <div class="stat-label">Usage This Period</div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="section-block">
+    <h2 class="section-title">Quick Actions</h2>
+    <div class="quick-actions-grid">
+        <a href="/dashboard/services" class="quick-action-card">
+            <div class="qa-icon">📄</div>
+            <h4>Summarize Document</h4>
+            <p>Extract key insights from any document</p>
+        </a>
+        <a href="/dashboard/services" class="quick-action-card">
+            <div class="qa-icon">⚖️</div>
+            <h4>Compare Quotations</h4>
+            <p>Side-by-side vendor comparison</p>
+        </a>
+        <a href="/dashboard/services" class="quick-action-card">
+            <div class="qa-icon">🔍</div>
+            <h4>Deep Parse</h4>
+            <p>Extract structured data from documents</p>
+        </a>
+        <a href="/dashboard/services" class="quick-action-card">
+            <div class="qa-icon">📝</div>
+            <h4>Generate RFP</h4>
+            <p>AI-powered RFP draft creation</p>
+        </a>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="section-block">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h2 class="section-title" style="margin-bottom: 0;">Recent Activity</h2>
+        <a href="/dashboard/analytics" style="color: var(--primary); text-decoration: none; font-size: 0.9rem;">View All
+            →</a>
+    </div>
+    <div class="activity-table">
+        <table>
+            <thead>
+                <tr>
+                    <th>Service</th>
+                    <th>File</th>
+                    <th>Status</th>
+                    <th>Time</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in history %}
+                <tr>
+                    <td>
+                        <span class="service-badge">{{ item.serviceName }}</span>
+                    </td>
+                    <td>{{ item.fileName or 'N/A' }}</td>
+                    <td>
+                        <span class="status-pill {{ 'success' if item.status == 'success' else 'error' }}">
+                            {{ item.status }}
+                        </span>
+                    </td>
+                    <td>{{ item.processingTime }}ms</td>
+                    <td>{{ item.processedAt.strftime('%b %d, %H:%M') if item.processedAt else 'N/A' }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 3rem; color: var(--text-muted);">
+                        No activity yet. Start processing documents to see your history here.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background: var(--bg-card);
+        border: 1px solid var(--glass-border);
+        border-radius: 16px;
+        padding: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--card-shadow);
+    }
+
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.3rem;
+        flex-shrink: 0;
+    }
+
+    .stat-value {
+        font-size: 1.75rem;
+        font-weight: 800;
+        color: var(--text-main);
+        line-height: 1;
+    }
+
+    .stat-label {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin-top: 0.25rem;
+    }
+
+    .section-block {
+        margin-bottom: 2rem;
+    }
+
+    .section-title {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--text-main);
+        margin-bottom: 1.5rem;
+    }
+
+    .quick-actions-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+    }
+
+    .quick-action-card {
+        background: var(--bg-card);
+        border: 1px solid var(--glass-border);
+        border-radius: 16px;
+        padding: 1.5rem;
+        text-decoration: none;
+        transition: all 0.3s;
+        cursor: pointer;
+    }
+
+    .quick-action-card:hover {
+        border-color: var(--primary);
+        transform: translateY(-2px);
+        box-shadow: 0 10px 30px rgba(251, 191, 36, 0.1);
+    }
+
+    .qa-icon {
+        font-size: 2rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .quick-action-card h4 {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-main);
+        margin-bottom: 0.5rem;
+    }
+
+    .quick-action-card p {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+    }
+
+    @media (max-width: 1024px) {
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .quick-actions-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+</style>
+{% endblock %}

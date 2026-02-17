@@ -1,0 +1,225 @@
+{% extends "dashboard_base.html" %}
+
+{% block page_title %}Integrations{% endblock %}
+
+{% block dashboard_content %}
+<div style="margin-bottom: 2rem;">
+    <p style="color: var(--text-muted); font-size: 1rem;">Connect Docapture to your existing tools and automate document
+        workflows.</p>
+</div>
+
+<div class="integrations-grid">
+    <!-- REST API -->
+    <div class="integration-card">
+        <div class="int-header">
+            <div class="int-icon connected">🔗</div>
+            <span class="int-status connected">Active</span>
+        </div>
+        <h3>REST API</h3>
+        <p>Direct API access with your personal API key. Full programmatic control over all services.</p>
+        <div class="api-key-box">
+            <code id="api-key-display">{{ api_key[:8] }}...{{ api_key[-4:] }}</code>
+            <button onclick="copyApiKey()" class="btn-copy" title="Copy API Key">📋</button>
+        </div>
+        <a href="/docs" class="int-link">View API Documentation →</a>
+    </div>
+
+    <!-- Webhook -->
+    <div class="integration-card">
+        <div class="int-header">
+            <div class="int-icon">🪝</div>
+            <span class="int-status inactive">Configure</span>
+        </div>
+        <h3>Webhooks</h3>
+        <p>Receive real-time notifications when document processing completes. Configure callback URLs.</p>
+        <form class="int-form" onsubmit="event.preventDefault(); alert('Webhook saved!');">
+            <input type="url" placeholder="https://your-app.com/webhook"
+                style="width:100%; padding: 0.65rem; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 8px; color: var(--text-main); font-size: 0.85rem;">
+            <button type="submit" class="btn-premium btn-primary"
+                style="width: 100%; margin-top: 0.75rem; padding: 0.6rem;">Save Webhook</button>
+        </form>
+    </div>
+
+    <!-- Google Drive -->
+    <div class="integration-card">
+        <div class="int-header">
+            <div class="int-icon">📁</div>
+            <span class="int-status inactive">Coming Soon</span>
+        </div>
+        <h3>Google Drive</h3>
+        <p>Automatically process documents uploaded to specific Google Drive folders.</p>
+        <button class="btn-premium btn-outline" style="width: 100%; opacity: 0.5; cursor: not-allowed;" disabled>Connect
+            Google Drive</button>
+    </div>
+
+    <!-- Slack -->
+    <div class="integration-card">
+        <div class="int-header">
+            <div class="int-icon">💬</div>
+            <span class="int-status inactive">Coming Soon</span>
+        </div>
+        <h3>Slack</h3>
+        <p>Process documents directly from Slack channels and receive results inline.</p>
+        <button class="btn-premium btn-outline" style="width: 100%; opacity: 0.5; cursor: not-allowed;" disabled>Connect
+            Slack</button>
+    </div>
+
+    <!-- SharePoint -->
+    <div class="integration-card">
+        <div class="int-header">
+            <div class="int-icon">🏢</div>
+            <span class="int-status inactive">Coming Soon</span>
+        </div>
+        <h3>SharePoint</h3>
+        <p>Integrate with Microsoft SharePoint for enterprise document management workflows.</p>
+        <button class="btn-premium btn-outline" style="width: 100%; opacity: 0.5; cursor: not-allowed;" disabled>Connect
+            SharePoint</button>
+    </div>
+
+    <!-- Zapier -->
+    <div class="integration-card">
+        <div class="int-header">
+            <div class="int-icon">⚡</div>
+            <span class="int-status inactive">Coming Soon</span>
+        </div>
+        <h3>Zapier</h3>
+        <p>Connect Docapture with 5,000+ apps through Zapier automations.</p>
+        <button class="btn-premium btn-outline" style="width: 100%; opacity: 0.5; cursor: not-allowed;" disabled>Connect
+            Zapier</button>
+    </div>
+</div>
+
+<script>
+    function copyApiKey() {
+        const key = '{{ api_key }}';
+        navigator.clipboard.writeText(key).then(() => {
+            const btn = document.querySelector('.btn-copy');
+            btn.textContent = '✅';
+            setTimeout(() => btn.textContent = '📋', 2000);
+        });
+    }
+</script>
+
+<style>
+    .integrations-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.5rem;
+    }
+
+    .integration-card {
+        background: var(--bg-card);
+        border: 1px solid var(--glass-border);
+        border-radius: 16px;
+        padding: 1.75rem;
+        transition: all 0.3s;
+    }
+
+    .integration-card:hover {
+        border-color: rgba(251, 191, 36, 0.3);
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+    }
+
+    .int-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+
+    .int-icon {
+        width: 44px;
+        height: 44px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.3rem;
+    }
+
+    .int-icon.connected {
+        background: rgba(34, 197, 94, 0.15);
+    }
+
+    .int-status {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-weight: 600;
+    }
+
+    .int-status.connected {
+        background: rgba(34, 197, 94, 0.15);
+        color: #22c55e;
+    }
+
+    .int-status.inactive {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-muted);
+    }
+
+    .integration-card h3 {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        color: var(--text-main);
+    }
+
+    .integration-card p {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        line-height: 1.5;
+        margin-bottom: 1.25rem;
+    }
+
+    .api-key-box {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--glass-border);
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .api-key-box code {
+        font-family: monospace;
+        color: var(--primary);
+        font-size: 0.85rem;
+        flex: 1;
+    }
+
+    .btn-copy {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+        padding: 0.25rem;
+    }
+
+    .int-link {
+        color: var(--primary);
+        text-decoration: none;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    .int-link:hover {
+        text-decoration: underline;
+    }
+
+    @media (max-width: 1024px) {
+        .integrations-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @media (max-width: 640px) {
+        .integrations-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}

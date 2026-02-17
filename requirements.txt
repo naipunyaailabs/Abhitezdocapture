@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+motor
+pydantic[email]
+pydantic-settings
+python-multipart
+python-dotenv
+python-docx
+pytesseract
+Pillow
+pymupdf
+motor
+bson
+aiohttp
+jinja2

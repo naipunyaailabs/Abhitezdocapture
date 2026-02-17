@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Enterprise Solutions - Docapture AI{% endblock %}
+
+{% block content %}
+<section class="hero" style="padding-bottom: 4rem;">
+    <div class="container">
+        <span class="hero-tag">Enterprise Scale</span>
+        <h1>Secure, Scalable <span>Intelligence</span></h1>
+        <p>Deploy Docapture on your private cloud or on-premise. Maintain full control over your data while leveraging
+            state-of-the-art AI.</p>
+        <div class="hero-actions">
+            <button class="btn-premium btn-primary">Schedule Consultation</button>
+            <button class="btn-premium btn-outline">Download Whitepaper</button>
+        </div>
+    </div>
+</section>
+
+<section class="container" style="margin-bottom: 8rem;">
+    <div class="services-grid">
+        <!-- Security -->
+        <div class="service-card">
+            <div class="icon-box">🔒</div>
+            <h3>Bank-Grade Security</h3>
+            <p>Your data never leaves your environment. We support air-gapped deployments and full encryption at rest
+                and in transit. SOC2 Type II compliant.</p>
+        </div>
+
+        <!-- Integration -->
+        <div class="service-card">
+            <div class="icon-box">🔌</div>
+            <h3>Seamless Integration</h3>
+            <p>Connect natively with SharePoint, Salesforce, SAP, and custom internal tools via our comprehensive REST
+                API and Webhooks.</p>
+        </div>
+
+        <!-- Custom Models -->
+        <div class="service-card">
+            <div class="icon-box">🧠</div>
+            <h3>Custom Model Training</h3>
+            <p>Fine-tune our models on your specific document types—contracts, invoices, medical records, or legal
+                filings—for maximum accuracy.</p>
+        </div>
+    </div>
+
+    <!-- Case Study Section -->
+    <div
+        style="background: var(--glass); border: 1px solid var(--glass-border); border-radius: 24px; padding: 4rem; text-align: center; position: relative; overflow: hidden;">
+        <div style="position: relative; z-index: 2;">
+            <h2 style="font-size: 2.5rem; font-weight: 800; margin-bottom: 1rem;">Trusted by Industry Leaders</h2>
+            <p style="color: var(--text-muted); font-size: 1.1rem; max-width: 700px; margin: 0 auto 3rem;">
+                "Docapture cut our RFP response time by 75%, allowing our sales team to focus on closing deals rather
+                than reading documents."
+            </p>
+            <div style="display: flex; justify-content: center; gap: 3rem; flex-wrap: wrap; opacity: 0.7;">
+                <div style="font-weight: 700; font-size: 1.5rem; color: #fff;">ACME Corp</div>
+                <div style="font-weight: 700; font-size: 1.5rem; color: #fff;">GlobalTech</div>
+                <div style="font-weight: 700; font-size: 1.5rem; color: #fff;">FinServe</div>
+                <div style="font-weight: 700; font-size: 1.5rem; color: #fff;">MediCare+</div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

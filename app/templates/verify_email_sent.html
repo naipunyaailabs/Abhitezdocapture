@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Verify Your Email - Docapture AI{% endblock %}
+
+{% block content %}
+<section class="auth-page">
+    <div class="auth-container" style="max-width: 500px;">
+        <div class="auth-card" style="text-align: center;">
+            <div style="font-size: 4rem; margin-bottom: 1.5rem;">📧</div>
+            <h2>Check your email</h2>
+            <p style="color: var(--text-muted); margin-top: 0.5rem; margin-bottom: 2rem; line-height: 1.6;">
+                We've sent a verification link to<br>
+                <strong style="color: var(--primary);" id="sent-email">{{ email }}</strong>
+            </p>
+            <div
+                style="background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.2); border-radius: 12px; padding: 1.25rem; margin-bottom: 2rem; font-size: 0.9rem; color: var(--text-muted);">
+                Click the link in the email to verify your account. Once verified, you can sign in and start processing
+                documents with your <strong style="color: var(--primary);">5 free document credits</strong>.
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+                Didn't receive the email? Check your spam folder or
+            </p>
+            <button class="btn-premium btn-outline" onclick="resendEmail()" id="resend-btn"
+                style="margin-bottom: 1.5rem;">Resend Verification Email</button>
+            <br>
+            <a href="/" style="color: var(--text-muted); font-size: 0.85rem; text-decoration: none;">← Back to Home</a>
+        </div>
+    </div>
+</section>
+
+<script>
+    async function resendEmail() {
+        const btn = document.getElementById('resend-btn');
+        const email = new URLSearchParams(window.location.search).get('email');
+        btn.textContent = 'Sending...';
+        btn.disabled = true;
+
+        try {
+            await fetch('/auth/resend-verification?email=' + encodeURIComponent(email), { method: 'POST' });
+            btn.textContent = '✅ Sent!';
+            setTimeout(() => { btn.textContent = 'Resend Verification Email'; btn.disabled = false; }, 3000);
+        } catch (e) {
+            btn.textContent = 'Failed — Try Again';
+            btn.disabled = false;
+        }
+    }
+</script>
+
+<style>
+    .auth-page {
+        min-height: 80vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4rem 2rem;
+    }
+
+    .auth-container {
+        width: 100%;
+    }
+
+    .auth-card {
+        background: var(--bg-card);
+        border: 1px solid var(--glass-border);
+        border-radius: 24px;
+        padding: 3rem;
+        box-shadow: var(--card-shadow);
+    }
+
+    .auth-card h2 {
+        font-size: 1.75rem;
+        font-weight: 800;
+        color: var(--text-main);
+    }
+</style>
+{% endblock %}

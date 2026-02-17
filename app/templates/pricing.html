@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Pricing - Docapture AI{% endblock %}
+
+{% block content %}
+<section class="hero" style="padding-bottom: 4rem;">
+    <div class="container">
+        <span class="hero-tag">Flexible Plans</span>
+        <h1>Simple Pricing for <span>Smart Teams</span></h1>
+        <p>Choose the plan that fits your document processing needs. No hidden fees. Cancel anytime.</p>
+    </div>
+</section>
+
+<section class="container" style="margin-bottom: 8rem;">
+    <div class="services-grid">
+        <!-- Starter Plan -->
+        <div class="service-card" style="display: flex; flex-direction: column;">
+            <div class="icon-box">🚀</div>
+            <h3>Starter</h3>
+            <p style="margin-bottom: 1rem;">Perfect for individuals and small teams starting with AI.</p>
+            <div style="font-size: 3rem; font-weight: 800; color: var(--primary); margin-bottom: 2rem;">
+                Free
+            </div>
+
+            <ul style="list-style: none; margin-bottom: 2rem; flex-grow: 1;">
+                <li
+                    style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted);">
+                    <span style="color: var(--primary);">✓</span> 5 Document Credits
+                </li>
+                <li
+                    style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted);">
+                    <span style="color: var(--primary);">✓</span> Basic Summarization
+                </li>
+                <li
+                    style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted);">
+                    <span style="color: var(--primary);">✓</span> PDF & Image Support
+                </li>
+                <li
+                    style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted);">
+                    <span style="color: var(--primary);">✓</span> Email Support
+                </li>
+            </ul>
+
+            <a href="/register" class="btn-premium btn-outline"
+                style="width: 100%; text-decoration: none; display: block; text-align: center;">Get Started</a>
+        </div>
+
+        <!-- Pro Plan -->
+        <div class="service-card"
+            style="display: flex; flex-direction: column; border-color: var(--primary); background: rgba(251, 191, 36, 0.05);">
+            <div
+                style="position: absolute; top: 0; right: 0; background: var(--primary); color: #000; padding: 0.5rem 1rem; font-weight: 700; border-bottom-left-radius: 12px; font-size: 0.8rem;">
+                POPULAR</div>
+            <div class="icon-box" style="background: var(--primary); color: #000;">⚡</div>
+            <h3>Professional</h3>
+            <p style="margin-bottom: 1rem;">For growing businesses needing advanced insights.</p>
+            <div style="font-size: 3rem; font-weight: 800; color: var(--primary); margin-bottom: 2rem;">
+                $49<span style="font-size: 1rem; color: var(--text-muted); font-weight: 500;">/mo</span>
+            </div>
+
+            <ul style="list-style: none; margin-bottom: 2rem; flex-grow: 1;">
+                <li
+                    style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted);">
+                    <span style="color: var(--primary);">✓</span> 2,000 Document Credits/mo
+                </li>
+                <li
+                    style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted);">
+                    <span style="color: var(--primary);">✓</span> Advanced RFP Analysis
+                </li>
+                <li
+                    style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted);">
+                    <span style="color: var(--primary);">✓</span> Vendor Comparison Matrix
+                </li>
+                <li
+                    style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted);">
+                    <span style="color: var(--primary);">✓</span> Priority Support
+                </li>
+                <li
+                    style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted);">
+                    <span style="color: var(--primary);">✓</span> API Access
+                </li>
+            </ul>
+
+            <a href="/register" class="btn-premium btn-primary"
+                style="width: 100%; text-decoration: none; display: block; text-align: center;">Start Free Trial</a>
+        </div>
+
+        <!-- Enterprise -->
+        <div class="service-card" style="display: flex; flex-direction: column;">
+            <div class="icon-box">🏢</div>
+            <h3>Enterprise</h3>
+            <p style="margin-bottom: 1rem;">Custom solutions for large-scale document operations.</p>
+            <div style="font-size: 3rem; font-weight: 800; color: var(--primary); margin-bottom: 2rem;">
+                Custom
+            </div>
+
+            <ul style="list-style: none; margin-bottom: 2rem; flex-grow: 1;">
+                <li
+                    style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted);">
+                    <span style="color: var(--primary);">✓</span> Unlimited Processing
+                </li>
+                <li
+                    style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted);">
+                    <span style="color: var(--primary);">✓</span> Custom AI Models
+                </li>
+                <li
+                    style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted);">
+                    <span style="color: var(--primary);">✓</span> On-Premise Deployment
+                </li>
+                <li
+                    style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted);">
+                    <span style="color: var(--primary);">✓</span> Dedicated Account Manager
+                </li>
+                <li
+                    style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted);">
+                    <span style="color: var(--primary);">✓</span> SLA Guarantees
+                </li>
+            </ul>
+
+            <a href="/enterprise" class="btn-premium btn-outline"
+                style="width: 100%; text-decoration: none; display: block; text-align: center;">Contact Sales</a>
+        </div>
+    </div>
+</section>
+{% endblock %}

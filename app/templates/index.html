@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero">
+    <div class="container">
+        <span class="hero-tag">Next-Gen Document Intelligence</span>
+        <h1>Transform Complex <span>Documents</span> into Actionable Insight</h1>
+        <p>Enterprise-grade AI platform for deep summarization, automated RFP generation, and intelligent vendor
+            comparison. Built for speed and precision.</p>
+        <div class="hero-actions">
+            <button class="btn-premium btn-primary" onclick="scrollToId('services')">Get Started Free</button>
+            <button class="btn-premium btn-outline">Watch Demo</button>
+        </div>
+        <div class="hero-illustration">
+            <img src="/static/assets/doc-capture-illustration.png" alt="Document Intelligence Platform">
+        </div>
+    </div>
+</section>
+
+<section id="services" class="container">
+    <div class="section-header">
+        <h2>AI Processing Suite</h2>
+        <p>Unlock structured intelligence from your unstructured data</p>
+    </div>
+
+    <div class="services-grid">
+        <!-- Summarization -->
+        <div class="service-card">
+            <div class="icon-box">📄</div>
+            <h3>Smart Summary</h3>
+            <p>Deeply analyze documents of any length and extract core concepts in seconds.</p>
+            <div id="sm-form-box" class="service-form">
+                <form onsubmit="handleService(event, '/summarize', 'Document Intelligence Paper')">
+                    <div class="form-group">
+                        <label>Source File</label>
+                        <input type="file" name="document" onchange="showPreview(event, 'preview-sm')" required>
+                    </div>
+                    <div id="preview-sm" class="preview-box"></div>
+                    <div class="form-group">
+                        <label>Context Prompt</label>
+                        <input type="text" name="prompt" placeholder="e.g. Focus on financial risks">
+                    </div>
+                    <div class="form-group">
+                        <label>Analysis Depth</label>
+                        <select name="length">
+                            <option value="short">Short</option>
+                            <option value="medium" selected>Standard</option>
+                            <option value="detailed">Executive Detailed</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Process
+                        Now</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Comparison -->
+        <div class="service-card">
+            <div class="icon-box">⚖️</div>
+            <h3>Vendor Matrix</h3>
+            <p>Automate side-by-side comparison of quotations and proposals with AI precision.</p>
+            <div id="comp-form-box" class="service-form">
+                <form onsubmit="handleService(event, '/compare-quotations', 'Comparison Matrix')">
+                    <div class="form-group">
+                        <label>Proposal Files</label>
+                        <input type="file" name="documents" multiple onchange="showPreview(event, 'preview-comp')"
+                            required>
+                    </div>
+                    <div id="preview-comp" class="preview-box"></div>
+                    <div class="form-group">
+                        <label>Evaluation Criteria</label>
+                        <input type="text" name="criteria" placeholder="e.g. pricing, delivery, SLA">
+                    </div>
+                    <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Generate
+                        Matrix</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- RFP -->
+        <div class="service-card">
+            <div class="icon-box">📝</div>
+            <h3>RFP Forge</h3>
+            <p>Generate high-quality Request for Proposals based on your business requirements.</p>
+            <div id="rfp-form-box" class="service-form">
+                <form onsubmit="handleJsonService(event, '/rfp/create', 'RFP Draft')">
+                    <div class="form-group">
+                        <label>Project Name</label>
+                        <input type="text" id="rfp-title" placeholder="Project title" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Entity</label>
+                        <input type="text" id="rfp-org" placeholder="Organization name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Deadline</label>
+                        <input type="date" id="rfp-deadline" required>
+                    </div>
+                    <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Forge
+                        RFP</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Deep Extraction -->
+        <div class="service-card">
+            <div class="icon-box">🔍</div>
+            <h3>Deep Parse</h3>
+            <p>Convert unstructured OCR text and documents into clean, structured data.</p>
+            <div id="ext-form-box" class="service-form">
+                <form onsubmit="handleService(event, '/extract', 'Structured Data Export')">
+                    <div class="form-group">
+                        <label>Input Document</label>
+                        <input type="file" name="document" onchange="showPreview(event, 'preview-ext')" required>
+                    </div>
+                    <div id="preview-ext" class="preview-box"></div>
+                    <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Extract
+                        Data</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- RFP Analysis -->
+        <div class="service-card">
+            <div class="icon-box">📈</div>
+            <h3>RFP Insight</h3>
+            <p>Quickly screen complex RFPs for key requirements and eligibility criteria.</p>
+            <div id="rfp-sum-box" class="service-form">
+                <form onsubmit="handleService(event, '/summarize-rfp', 'RFP Screening Report')">
+                    <div class="form-group">
+                        <label>RFP Document</label>
+                        <input type="file" name="document" onchange="showPreview(event, 'preview-rfp')" required>
+                    </div>
+                    <div id="preview-rfp" class="preview-box"></div>
+                    <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Analyze
+                        RFP</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Placeholder card for Wow -->
+        <div class="service-card"
+            style="display: flex; flex-direction: column; justify-content: center; background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), transparent);">
+            <div class="icon-box" style="margin-bottom: 1rem;">✨</div>
+            <h3>Custom Solutions</h3>
+            <p>Connect our API to your existing workflow for automated document pipelines.</p>
+            <button class="btn-premium btn-outline" style="width: 100%;">Contact Enterprise</button>
+        </div>
+    </div>
+</section>
+{% endblock %}

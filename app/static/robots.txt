@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard/
+Disallow: /auth/
+Disallow: /history/
+Disallow: /api/
+
+Sitemap: https://docapture.com/sitemap.xml

@@ -1,0 +1,254 @@
+{% extends "dashboard_base.html" %}
+
+{% block page_title %}Analytics{% endblock %}
+
+{% block dashboard_content %}
+<!-- Date Range -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <p style="color: var(--text-muted); font-size: 0.95rem;">Overview of your document processing performance.</p>
+    <select id="analytics-range" onchange="loadAnalytics()"
+        style="padding: 0.5rem 1rem; background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 8px; color: var(--text-main); font-size: 0.85rem;">
+        <option value="7">Last 7 Days</option>
+        <option value="30" selected>Last 30 Days</option>
+        <option value="90">Last 90 Days</option>
+    </select>
+</div>
+
+<!-- Stats -->
+<!-- Stats -->
+<div class="analytics-stats">
+    {% set total = analytics.totalProcessed or 0 %}
+    {% set success = analytics.successCount or 0 %}
+    {% set errors = analytics.errorCount or 0 %}
+
+    {% if total > 0 %}
+    {% set success_pct = (success / total * 100) | round(1) %}
+    {% set error_pct = (errors / total * 100) | round(1) %}
+    {% else %}
+    {% set success_pct = 0 %}
+    {% set error_pct = 0 %}
+    {% endif %}
+
+    <div class="a-stat">
+        <div class="a-stat-val" id="a-total">{{ total }}</div>
+        <div class="a-stat-label">Total Processed</div>
+        <div class="a-stat-chart">
+            <div class="bar-fill bar-fill-yellow" style="width: 100%;"></div>
+        </div>
+    </div>
+    <div class="a-stat">
+        <div class="a-stat-val" id="a-success" style="color: #22c55e;">{{ success }}</div>
+        <div class="a-stat-label">Successful</div>
+        <div class="a-stat-chart">
+            <div class="bar-fill bar-fill-green" style="width: {{ success_pct }}%;"></div>
+        </div>
+    </div>
+    <div class="a-stat">
+        <div class="a-stat-val" id="a-errors" style="color: #ef4444;">{{ errors }}</div>
+        <div class="a-stat-label">Errors</div>
+        <div class="a-stat-chart">
+            <div class="bar-fill bar-fill-red" style="width: {{ error_pct }}%;"></div>
+        </div>
+    </div>
+    <div class="a-stat">
+        <div class="a-stat-val" id="a-rate" style="color: #6366f1;">{{ success_pct }}%</div>
+        <div class="a-stat-label">Success Rate</div>
+        <div class="a-stat-chart">
+            <div class="bar-fill bar-fill-indigo" style="width: {{ success_pct }}%;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Service Usage Breakdown -->
+<div class="section-block" style="margin-top: 2rem;">
+    <h2 class="section-title">Service Usage Breakdown</h2>
+    <div class="usage-breakdown">
+        {% for svc in service_usage %}
+        <div class="usage-row">
+            <div class="usage-label">{{ svc.name }}</div>
+            <div class="usage-bar-container">
+                <div class="usage-bar" style="width: {{ svc.percent }}%; background: {{ svc.color }};"></div>
+            </div>
+            <div class="usage-count">{{ svc.count }}</div>
+        </div>
+        {% else %}
+        <div style="text-align: center; padding: 2rem; color: var(--text-muted);">No usage data available yet.</div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Full History Table -->
+<div class="section-block" style="margin-top: 2rem;">
+    <h2 class="section-title">Processing History</h2>
+    <div class="activity-table">
+        <table>
+            <thead>
+                <tr>
+                    <th>Service</th>
+                    <th>File</th>
+                    <th>Size</th>
+                    <th>Status</th>
+                    <th>Processing Time</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in history %}
+                <tr>
+                    <td><span class="service-badge">{{ item.serviceName }}</span></td>
+                    <td>{{ item.fileName or 'N/A' }}</td>
+                    <td>{{ "%.1f"|format(item.fileSize / 1024) if item.fileSize else '—' }} KB</td>
+                    <td>
+                        <span class="status-pill {{ 'success' if item.status == 'success' else 'error' }}">{{
+                            item.status }}</span>
+                    </td>
+                    <td>{{ item.processingTime }}ms</td>
+                    <td>{{ item.processedAt.strftime('%b %d, %Y %H:%M') if item.processedAt else 'N/A' }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 3rem; color: var(--text-muted);">
+                        No processing history available.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    async function loadAnalytics() {
+        const days = document.getElementById('analytics-range').value;
+        const token = localStorage.getItem('token');
+        try {
+            const res = await fetch(`/history/analytics?days=${days}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (data.success) {
+                const a = data.data;
+                document.getElementById('a-total').textContent = a.totalProcessed;
+                document.getElementById('a-success').textContent = a.successCount;
+                document.getElementById('a-errors').textContent = a.errorCount;
+                const rate = a.totalProcessed > 0 ? (a.successCount / a.totalProcessed * 100).toFixed(1) : '0.0';
+                document.getElementById('a-rate').textContent = rate + '%';
+            }
+        } catch (e) {
+            console.error('Failed to load analytics', e);
+        }
+    }
+</script>
+
+<style>
+    .analytics-stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1.5rem;
+    }
+
+    .a-stat {
+        background: var(--bg-card);
+        border: 1px solid var(--glass-border);
+        border-radius: 16px;
+        padding: 1.5rem;
+    }
+
+    .a-stat-val {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: var(--text-main);
+        line-height: 1;
+        margin-bottom: 0.5rem;
+    }
+
+    .a-stat-label {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin-bottom: 1rem;
+    }
+
+    .a-stat-chart {
+        height: 6px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    .bar-fill {
+        height: 100%;
+        border-radius: 3px;
+        transition: width 0.5s ease;
+    }
+
+    .bar-fill-yellow {
+        background: linear-gradient(90deg, #fbbf24, #d97706);
+    }
+
+    .bar-fill-green {
+        background: linear-gradient(90deg, #22c55e, #16a34a);
+    }
+
+    .bar-fill-red {
+        background: linear-gradient(90deg, #ef4444, #dc2626);
+    }
+
+    .bar-fill-indigo {
+        background: linear-gradient(90deg, #6366f1, #4f46e5);
+    }
+
+    .usage-breakdown {
+        background: var(--bg-card);
+        border: 1px solid var(--glass-border);
+        border-radius: 16px;
+        padding: 1.5rem;
+    }
+
+    .usage-row {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .usage-row:last-child {
+        border-bottom: none;
+    }
+
+    .usage-label {
+        width: 180px;
+        font-weight: 600;
+        color: var(--text-main);
+        font-size: 0.9rem;
+    }
+
+    .usage-bar-container {
+        flex: 1;
+        height: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .usage-bar {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.5s ease;
+    }
+
+    .usage-count {
+        width: 40px;
+        text-align: right;
+        font-weight: 700;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+    }
+
+    @media (max-width: 1024px) {
+        .analytics-stats {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+</style>
+{% endblock %}

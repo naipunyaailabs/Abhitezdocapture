@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Docapture AI | Advanced Document Intelligence{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+    <script>
+        // Pre-apply theme to avoid flash
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    </script>
+</head>
+
+<body>
+    <div class="mesh-gradient"></div>
+    <div class="noise-bg"></div>
+
+    <header>
+        <div class="container nav">
+            <a href="/" class="logo">
+                <img src="/static/assets/docapture-logo.png" alt="Docapture AI" style="height: 32px; width: auto;">
+            </a>
+            <div class="nav-links">
+                <a href="/">Platform</a>
+                <a href="/enterprise">Enterprise</a>
+                <a href="/pricing">Pricing</a>
+                <a href="/docs">API</a>
+            </div>
+            <button class="theme-toggle-btn" onclick="toggleTheme()" id="theme-btn" style="margin-right: 1rem;">
+                🌙
+            </button>
+            <div id="auth-section" style="display: flex; gap: 0.75rem; align-items: center;">
+                <a href="/register" class="btn-premium btn-outline"
+                    style="text-decoration: none; padding: 0.5rem 1.25rem; font-size: 0.85rem;">Register</a>
+                <button class="btn-premium btn-primary" onclick="openLogin()"
+                    style="padding: 0.5rem 1.25rem; font-size: 0.85rem;">Sign In</button>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer
+        style="border-top: 1px solid var(--glass-border); padding: 4rem 0; margin-top: 4rem; background: rgba(2, 6, 23, 0.4);">
+        <div class="container">
+            <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 2rem;">
+                <div>
+                    <h3 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem; color: #fff;">Docapture<span
+                            style="color: var(--primary)">AI</span></h3>
+                    <p style="color: var(--text-muted); max-width: 300px;">Transforming unstructured documents into
+                        actionable intelligence for the enterprise.</p>
+                </div>
+                <div>
+                    <h4 style="color: #fff; margin-bottom: 1rem;">Platform</h4>
+                    <ul style="list-style: none; display: flex; flex-direction: column; gap: 0.5rem;">
+                        <li><a href="/" style="color: var(--text-muted); text-decoration: none;">Deep Parse</a></li>
+                        <li><a href="/" style="color: var(--text-muted); text-decoration: none;">Vendor Matrix</a></li>
+                        <li><a href="/" style="color: var(--text-muted); text-decoration: none;">RFP Forge</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 style="color: #fff; margin-bottom: 1rem;">Company</h4>
+                    <ul style="list-style: none; display: flex; flex-direction: column; gap: 0.5rem;">
+                        <li><a href="/enterprise"
+                                style="color: var(--text-muted); text-decoration: none;">Enterprise</a></li>
+                        <li><a href="/pricing" style="color: var(--text-muted); text-decoration: none;">Pricing</a></li>
+                        <li><a href="/docs" style="color: var(--text-muted); text-decoration: none;">API Docs</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 style="color: #fff; margin-bottom: 1rem;">Legal</h4>
+                    <ul style="list-style: none; display: flex; flex-direction: column; gap: 0.5rem;">
+                        <li><a href="#" style="color: var(--text-muted); text-decoration: none;">Privacy Policy</a></li>
+                        <li><a href="#" style="color: var(--text-muted); text-decoration: none;">Terms of Service</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div
+                style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--glass-border); text-align: center; color: var(--text-muted); font-size: 0.9rem;">
+                &copy; 2026 Docapture AI. All rights reserved.
+            </div>
+        </div>
+    </footer>
+
+    <!-- Results Overlay -->
+    <div id="overlay" class="overlay-panel">
+        <div class="overlay-header">
+            <div>
+                <h2 id="result-title" style="margin-bottom: 0.5rem;">Result Title</h2>
+                <div id="result-meta" style="color: var(--text-muted); font-size: 0.85rem;">Meta info</div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button id="excel-export-btn" class="btn-premium btn-primary"
+                    style="display: none; padding: 0.5rem 1rem; font-size: 0.8rem;" onclick="exportToExcel()">Export
+                    Excel</button>
+                <button class="close-btn" onclick="closeOverlay()">×</button>
+            </div>
+        </div>
+        <div id="result-body" class="overlay-content prose">
+            <!-- Content -->
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="login-modal"
+        style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); display: none; justify-content: center; align-items: center; z-index: 3000;">
+        <div
+            style="background: #0f172a; padding: 3rem; border-radius: 24px; width: 100%; max-width: 460px; border: 1px solid var(--glass-border); box-shadow: var(--card-shadow);">
+            <div style="text-align: center; margin-bottom: 2rem;">
+                <img src="/static/assets/docapture-logo.png" alt="Docapture" style="height: 48px; width: auto;">
+            </div>
+            <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; text-align: center; color: #fff;">
+                Welcome Back</h2>
+            <p style="text-align: center; color: var(--text-muted); margin-bottom: 2rem;">Sign in to access your
+                dashboard</p>
+            <div class="login-error"
+                style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.9rem; margin-bottom: 1rem;">
+            </div>
+            <form onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label>Work Email</label>
+                    <input type="email" id="email" placeholder="name@company.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="password" required>
+                </div>
+                <button type="submit" class="btn-premium btn-primary" style="width: 100%; margin-top: 1rem;">Sign
+                    In</button>
+            </form>
+            <p style="text-align: center; margin-top: 1.5rem; color: var(--text-muted); font-size: 0.9rem;">
+                Don't have an account? <a href="/register"
+                    style="color: var(--primary); text-decoration: none; font-weight: 600;">Create one free</a>
+            </p>
+            <button onclick="closeLogin()"
+                style="background: none; border: none; color: var(--text-muted); margin-top: 1rem; cursor: pointer; display: block; width: 100%; font-size: 0.85rem;">Cancel</button>
+        </div>
+    </div>
+
+    <script src="/static/sdk.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>
