@@ -44,6 +44,4 @@ env.ext/
 Thumbs.db
 
 # Docker
-Dockerfile
-docker-compose.yml
-.dockerignore
+.docker_tmp/
