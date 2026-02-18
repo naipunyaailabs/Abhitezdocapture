@@ -330,6 +330,101 @@ async function handleJsonService(event, endpoint, title) {
     }
 }
 
+async function handleReconciliation(event) {
+    event.preventDefault();
+    const token = localStorage.getItem('token');
+    if (!token) return openLogin();
+
+    const form = event.target;
+    const btn = form.querySelector('button');
+    const originalText = btn.innerHTML;
+
+    btn.innerHTML = 'Reconciling...';
+    btn.disabled = true;
+
+    const formData = new FormData(form);
+
+    try {
+        const response = await fetch(`${API_BASE}/reconcile`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            const data = result.data.result;
+
+            let html = `
+                <div class="reconciliation-results">
+                    <h3 style="color:var(--text-main); margin-bottom:1rem;">Reconciliation Summary</h3>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
+                        <div style="background:rgba(255,255,255,0.03); padding:1rem; border-radius:12px; border:1px solid var(--glass-border); text-align:center;">
+                            <label style="display:block; font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.5rem;">Bank Items</label>
+                            <div style="font-size:1.5rem; font-weight:700; color:#fff;">${data.summary.total_bank}</div>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.03); padding:1rem; border-radius:12px; border:1px solid var(--glass-border); text-align:center;">
+                            <label style="display:block; font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.5rem;">Ledger Entries</label>
+                            <div style="font-size:1.5rem; font-weight:700; color:#fff;">${data.summary.total_ledger}</div>
+                        </div>
+                        <div style="background:rgba(34,197,94,0.1); padding:1rem; border-radius:12px; border:1px solid rgba(34,197,94,0.2); text-align:center;">
+                            <label style="display:block; font-size:0.75rem; color:#22c55e; text-transform:uppercase; margin-bottom:0.5rem;">Matched</label>
+                            <div style="font-size:1.5rem; font-weight:700; color:#22c55e;">${data.summary.matched_count}</div>
+                        </div>
+                        <div style="background:rgba(239,68,68,0.1); padding:1rem; border-radius:12px; border:1px solid rgba(239,68,68,0.2); text-align:center;">
+                            <label style="display:block; font-size:0.75rem; color:#ef4444; text-transform:uppercase; margin-bottom:0.5rem;">Discrepancies</label>
+                            <div style="font-size:1.5rem; font-weight:700; color:#ef4444;">${data.summary.discrepancy_count}</div>
+                        </div>
+                    </div>
+                    
+                    <h3 style="color:var(--text-main); margin-bottom:1rem;">Matched Transactions</h3>
+                    <div style="max-height: 400px; overflow-y: auto; background:rgba(255,255,255,0.02); border:1px solid var(--glass-border); border-radius:12px;">
+                        <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+                            <thead style="position:sticky; top:0; background:#1e293b; z-index:10;">
+                                <tr>
+                                    <th style="padding:1rem; text-align:left; border-bottom:1px solid var(--glass-border);">Bank Item</th>
+                                    <th style="padding:1rem; text-align:left; border-bottom:1px solid var(--glass-border);">Ledger Item</th>
+                                    <th style="padding:1rem; text-align:center; border-bottom:1px solid var(--glass-border);">Confidence</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.matches.map(m => `
+                                    <tr>
+                                        <td style="padding:1rem; border-bottom:1px solid rgba(255,255,255,0.05);">
+                                            <div style="font-weight:600;">$${m.bank_transaction.amount.toFixed(2)}</div>
+                                            <div style="color:var(--text-muted); font-size:0.75rem;">${m.bank_transaction.date} • ${m.bank_transaction.description}</div>
+                                        </td>
+                                        <td style="padding:1rem; border-bottom:1px solid rgba(255,255,255,0.05);">
+                                            <div style="font-weight:600;">$${m.ledger_entry.amount.toFixed(2)}</div>
+                                            <div style="color:var(--text-muted); font-size:0.75rem;">${m.ledger_entry.date} • ${m.ledger_entry.description}</div>
+                                        </td>
+                                        <td style="padding:1rem; text-align:center; border-bottom:1px solid rgba(255,255,255,0.05);">
+                                            <div style="background:rgba(251,191,36,0.1); color:#fbbf24; padding:0.25rem 0.5rem; border-radius:4px; font-weight:600;">
+                                                ${(m.match_score * 100).toFixed(0)}%
+                                            </div>
+                                            <div style="color:var(--text-muted); font-size:0.7rem; margin-top:0.25rem;">${m.match_reason}</div>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                                ${data.matches.length === 0 ? '<tr><td colspan="3" style="padding:2rem; text-align:center; color:var(--text-muted);">No matches found</td></tr>' : ''}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            showOverlay('Reconciliation Report', html);
+        } else {
+            alert(result.detail || 'Reconciliation failed');
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Network error');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
+
 function initTheme() {
     const theme = localStorage.getItem('theme') || 'dark';
     document.documentElement.setAttribute('data-theme', theme);

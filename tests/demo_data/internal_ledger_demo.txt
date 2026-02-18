@@ -1,0 +1,16 @@
+GENERAL LEDGER - JAN 2024
+Organization: My Startup Inc.
+
+Date        Entry Name                              Debit       Credit
+2024-01-05  Amazon - Cloud Services                 124.50      
+2024-01-10  Monthly Revenue / Salary Inbound                    3,500.00
+2024-01-11  Satellite Internet Subscription         120.00      
+2024-01-15  Verizon monthly bill                    85.00       
+2024-01-20  Apple iCloud Storage                    9.99        
+2024-01-28  Office Rent                             1,200.00    
+2024-01-30  Office Supplies - Staples               45.00       
+
+Notes:
+- ATM withdrawal not yet recorded in ledger.
+- Starbucks expense categorized under petty cash, missing here.
+- Added Staples expense which is not on bank statement (unmatched ledger).

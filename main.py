@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from app.config import settings
 from app.database import db
-from app.routers import auth, rfp, extract, history, subscription, services, summarize, compare, summarize_rfp, upload, invoice
+from app.routers import auth, rfp, extract, history, subscription, services, summarize, compare, summarize_rfp, upload, invoice, bank_reconciliation
 from app.utils.auth import get_current_user
 from app.services.subscription_service import subscription_service
 from app.services.history_service import history_service
@@ -36,6 +36,7 @@ app.include_router(summarize.router, prefix="/summarize", tags=["summarize"])
 app.include_router(compare.router, prefix="/compare-quotations", tags=["compare"])
 app.include_router(summarize_rfp.router, prefix="/summarize-rfp", tags=["summarize-rfp"])
 app.include_router(invoice.router, prefix="/invoice", tags=["invoice"])
+app.include_router(bank_reconciliation.router, prefix="/reconcile", tags=["reconcile"])
 app.include_router(upload.router, prefix="/upload", tags=["upload"])
 
 # Static files
