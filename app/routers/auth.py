@@ -32,7 +32,7 @@ async def register(user_create: UserCreate, background_tasks: BackgroundTasks):
     # Create trial subscription
     await subscription_service.create_trial(user.userId)
     
-    token = auth_service.create_session(user.userId)
+    token = await auth_service.create_session(user.userId)
     
     return RegisterResponse(
         token=token,
@@ -57,7 +57,7 @@ async def login(login_req: LoginRequest):
     # Update last login
     await auth_service.update_user(user.userId, {"lastLoginAt": datetime.now()})
 
-    token = auth_service.create_session(user.userId)
+    token = await auth_service.create_session(user.userId)
     
     return LoginResponse(
         token=token,
@@ -70,7 +70,7 @@ async def logout(authorization: Optional[str] = Header(None)):
         raise HTTPException(status_code=401, detail="Unauthorized")
     
     token = authorization.split(" ")[1]
-    auth_service.invalidate_session(token)
+    await auth_service.invalidate_session(token)
     return {"message": "Logged out successfully"}
 
 @router.get("/profile", response_model=UserResponse)

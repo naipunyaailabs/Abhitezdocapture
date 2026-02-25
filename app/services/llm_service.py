@@ -34,9 +34,8 @@ class LLMService:
         image_base64: str = None, 
         image_mime_type: str = "image/jpeg"
     ) -> str:
-        # Note: The original code used 'meta-llama/llama-4-scout-17b-16e-instruct'
-        # which seems custom. Using a standard versatile model as fallback if needed.
-        model = "llama-3.2-90b-vision-preview" if image_base64 else "llama-3.3-70b-versatile" 
+        # Use Llama 4 Scout for vision (multimodal), Llama 3.3 for text-only
+        model = "meta-llama/llama-4-scout-17b-16e-instruct" if image_base64 else "llama-3.3-70b-versatile" 
         
         messages = [{"role": "system", "content": system}]
         
@@ -60,7 +59,7 @@ class LLMService:
             completion = await self.groq_client.chat.completions.create(
                 model=model,
                 messages=messages,
-                temperature=0.6,
+                temperature=0.1,
                 max_tokens=4096,
                 top_p=0.95,
                 stream=False,

@@ -31,8 +31,11 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> UserR
             emailVerified=True
         )
 
-    user_id = auth_service.get_user_id_from_token(token)
+    print(f"[Auth] Calling get_user_id_from_token for: {token[:10]}...")
+    user_id = await auth_service.get_user_id_from_token(token)
+    print(f"[Auth] Result from auth_service: user_id={user_id}")
     if not user_id:
+        print("[Auth] Session invalid or expired")
         raise HTTPException(status_code=401, detail="Invalid session")
 
     user = await auth_service.find_user_by_id(user_id)

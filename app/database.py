@@ -6,9 +6,15 @@ class Database:
     db = None
 
     async def connect_to_database(self):
-        self.client = AsyncIOMotorClient(settings.MONGODB_URI)
-        self.db = self.client[settings.DB_NAME]
-        print("Connected to MongoDB")
+        try:
+            self.client = AsyncIOMotorClient(settings.MONGODB_URI)
+            # Ping to verify connection
+            await self.client.admin.command('ping')
+            self.db = self.client[settings.DB_NAME]
+            print("Successfully connected to MongoDB")
+        except Exception as e:
+            print(f"CRITICAL: Failed to connect to MongoDB: {e}")
+            self.db = None
 
     async def close_database_connection(self):
         if self.client:
@@ -18,4 +24,5 @@ class Database:
 db = Database()
 
 async def get_database():
+    print(f"[Database] get_database() called. db.db is {'None' if db.db is None else 'Not None'}")
     return db.db

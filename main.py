@@ -1,11 +1,13 @@
 from fastapi import FastAPI, Depends, Request, HTTPException
+from contextlib import asynccontextmanager
+
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from app.config import settings
 from app.database import db
-from app.routers import auth, rfp, extract, history, subscription, services, summarize, compare, summarize_rfp, upload, invoice, bank_reconciliation
+from app.routers import auth, rfp, extract, history, subscription, services, summarize, compare, summarize_rfp, upload, invoice, bank_reconciliation, deep_parse_router
 from app.utils.auth import get_current_user
 from app.services.subscription_service import subscription_service
 from app.services.history_service import history_service
@@ -14,7 +16,16 @@ from app.models.user import UserResponse
 import uvicorn
 import os
 
-app = FastAPI(title=settings.APP_NAME)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    await db.connect_to_database()
+    yield
+    # Shutdown
+    await db.close_database_connection()
+
+app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
+
 
 # CORS configuration
 app.add_middleware(
@@ -38,6 +49,7 @@ app.include_router(summarize_rfp.router, prefix="/summarize-rfp", tags=["summari
 app.include_router(invoice.router, prefix="/invoice", tags=["invoice"])
 app.include_router(bank_reconciliation.router, prefix="/reconcile", tags=["reconcile"])
 app.include_router(upload.router, prefix="/upload", tags=["upload"])
+app.include_router(deep_parse_router.router, prefix="/api/deep-parse", tags=["deep-parse"])
 
 # Static files
 static_path = os.path.join(os.path.dirname(__file__), "app/static")
@@ -55,13 +67,6 @@ async def sitemap():
 async def robots():
     return FileResponse("app/static/robots.txt")
 
-@app.on_event("startup")
-async def startup_db_client():
-    await db.connect_to_database()
-
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    await db.close_database_connection()
 
 
 # ─── Public Pages ───────────────────────────────────────────
@@ -118,7 +123,7 @@ async def get_dashboard_context(request: Request, active_page: str):
     if not token:
         return None
     
-    user_id = auth_service.get_user_id_from_token(token)
+    user_id = await auth_service.get_user_id_from_token(token)
     if not user_id:
         return None
 

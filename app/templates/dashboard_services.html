@@ -3,6 +3,10 @@
 {% block page_title %}Services{% endblock %}
 
 {% block dashboard_content %}
+<!-- Deep Parse Isolated Assets -->
+<link rel="stylesheet" href="/static/components/services/deep-parse/deep-parse.css?v=1.1">
+<script src="/static/components/services/deep-parse/deep-parse.js?v=1.4" defer></script>
+
 <div class="services-header">
     <p style="color: var(--text-muted); font-size: 1rem;">Upload documents and leverage AI to extract intelligence.</p>
 </div>
@@ -73,14 +77,28 @@
                 <span class="dsc-tag">Data Extraction</span>
             </div>
         </div>
-        <p>Convert unstructured OCR text and documents into clean, structured data tables.</p>
-        <form class="dsc-form" onsubmit="handleService(event, '/extract', 'Structured Data')">
+        <p>Convert unstructured multi-page PDFs into clean, structured data tables with side-by-side validation.</p>
+        <form class="dsc-form" id="deep-parse-form"
+            onsubmit="event.preventDefault(); handleDeepParseSubmit();">
             <div class="form-group">
-                <label>Input Document</label>
-                <input type="file" name="document" onchange="showPreview(event, 'dp-ext')" required>
+                <label>Input Mode</label>
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+                    <button type="button" class="dp-mode-btn active" id="dp-mode-files" onclick="switchDeepParseMode('files')">📄 Select PDF(s)</button>
+                    <button type="button" class="dp-mode-btn" id="dp-mode-folder" onclick="switchDeepParseMode('folder')">📁 Select Folder</button>
+                </div>
+            </div>
+            <div class="form-group" id="dp-files-input-group">
+                <label>Select PDF Files</label>
+                <input type="file" id="dp-input-files" name="document" accept=".pdf" multiple
+                    onchange="showPreview(event, 'dp-ext')">
+            </div>
+            <div class="form-group" id="dp-folder-input-group" style="display: none;">
+                <label>Select Folder Containing PDFs</label>
+                <input type="file" id="dp-input-folder" name="document" webkitdirectory directory
+                    onchange="showPreview(event, 'dp-ext')">
             </div>
             <div id="dp-ext" class="preview-box"></div>
-            <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Extract Data</button>
+            <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Analyze Multi-Page PDF</button>
         </form>
     </div>
 
@@ -282,5 +300,75 @@
             grid-template-columns: 1fr;
         }
     }
+
+    /* Deep Parse mode toggle buttons */
+    .dp-mode-btn {
+        flex: 1;
+        padding: 0.6rem 1rem;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--glass-border);
+        border-radius: 8px;
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .dp-mode-btn:hover {
+        border-color: var(--primary);
+        color: var(--text-main);
+    }
+    .dp-mode-btn.active {
+        background: rgba(251, 191, 36, 0.15);
+        border-color: var(--primary);
+        color: var(--primary);
+    }
 </style>
+
+<script>
+function switchDeepParseMode(mode) {
+    const filesGroup = document.getElementById('dp-files-input-group');
+    const folderGroup = document.getElementById('dp-folder-input-group');
+    const btnFiles = document.getElementById('dp-mode-files');
+    const btnFolder = document.getElementById('dp-mode-folder');
+    const preview = document.getElementById('dp-ext');
+
+    // Clear previews and inputs
+    if (preview) preview.innerHTML = '';
+    document.getElementById('dp-input-files').value = '';
+    document.getElementById('dp-input-folder').value = '';
+
+    if (mode === 'files') {
+        filesGroup.style.display = 'block';
+        folderGroup.style.display = 'none';
+        btnFiles.classList.add('active');
+        btnFolder.classList.remove('active');
+    } else {
+        filesGroup.style.display = 'none';
+        folderGroup.style.display = 'block';
+        btnFiles.classList.remove('active');
+        btnFolder.classList.add('active');
+    }
+}
+
+function handleDeepParseSubmit() {
+    const filesInput = document.getElementById('dp-input-files');
+    const folderInput = document.getElementById('dp-input-folder');
+    const isFilesMode = document.getElementById('dp-mode-files').classList.contains('active');
+
+    let files;
+    if (isFilesMode) {
+        files = filesInput.files;
+    } else {
+        files = folderInput.files;
+    }
+
+    if (!files || files.length === 0) {
+        alert('Please select PDF file(s) or a folder first.');
+        return;
+    }
+
+    deepParse.processFiles(files);
+}
+</script>
 {% endblock %}

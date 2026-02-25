@@ -13,3 +13,6 @@ aiohttp
 httpx
 groq
 jinja2
+
+# For Excel Generation
+openpyxl

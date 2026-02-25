@@ -84,33 +84,43 @@ class ExtractService:
         return text.strip()
 
     async def structured_extraction(self, text: str) -> Dict[str, Any]:
-        system_prompt = """You are an Expert Forensic Data Extractor.
-Your Mission: Perform a zero-loss, exhaustive extraction of all data points from the provided document.
+        system_prompt = """You are an Expert Forensic Data Extractor specializing in Goods Receipt and Invoice processing.
+Your Mission: Perform a zero-loss, exhaustive extraction of all data points from the provided document, specifically targeting fields for a Goods Receipt template.
 
 CRITICAL RULES:
-1. **DO NOT MISS ANY INFORMATION**: If a detail exists in the text (numbers, IDs, names, dates, clauses), it MUST be captured.
-2. **Exhaustive key_values**: Any information that does not fit the primary schema fields (title, author, etc.) MUST be included as a highly descriptive key-value pair in the 'key_values' object.
-3. **Format Precision**: Output ONLY valid JSON. If a standard field is missing, use null, but prioritize finding it.
-4. **Data Normalization**: Format dates as YYYY-MM-DD and normalize currency codes.
-5. **Entity Recognition**: Correct any OCR errors by inferring context (e.g., '1nvoice' -> 'invoice')."""
+1. **NO PLACEHOLDERS**: NEVER use the word "Mandatory" or "Required" as a value. If a piece of information is not found in the text, use "N/A".
+2. **DATA INTEGRITY**: Perform a zero-loss extraction. If it's on the page, it must be in the JSON.
+3. **LINE ITEM PRECISION**: 'item_amount' refers to the TOTAL for that specific line (Qty * Rate). DO NOT put the Grand Total of the entire invoice here.
+4. **Specific Details**: Rigorously search for Lot No, Shade No, Item Code, and PO Number.
+5. **Format Precision**: Output ONLY valid JSON.
+6. **Data Normalization**: Format dates as YYYY-MM-DD. Normalize numbers to strings without extra text (e.g., "163" instead of "163 boxes")."""
 
         schema_instructions = """
         Target JSON Schema:
         {
-            "title": "Main Document Heading or Primary Subject",
-            "author": "The originating entity, person, or organization",
-            "date": "Primary document date (normalized to YYYY-MM-DD)",
-            "total_amount": "Final numeric value or total cost (number or string)",
-            "currency": "3-letter currency code (USD, EUR, etc)",
-            "key_values": {
-                "invoice_number": "...", 
-                "po_number": "...", 
-                "delivery_address": "...",
-                "payment_terms": "...",
-                "tax_id": "...",
-                "line_items": "Detailed summary of items if present",
-                "notes": "Any extra fine print or remarks",
-                ... (EXTRACT EVERY OTHER UNIQUE DATA POINT FOUND AS A KEY:VALUE PAIR)
+            "supplier_name": "Full name of the seller/supplier",
+            "gst_no": "GSTIN of the supplier",
+            "invoice_no": "Invoice number",
+            "invoice_date": "Date of the invoice (YYYY-MM-DD)",
+            "challan_no": "Challan or Delivery Note number if present",
+            "challan_date": "Date of the challan if present",
+            "gate_entry_no": "Gate entry number if present",
+            "gate_entry_date": "Date of gate entry if present",
+            "po_number": "Purchase Order (PO) number",
+            "line_items": [
+                {
+                    "item_code": "Code or SKU for the item if present",
+                    "item_description": "Full description of the goods",
+                    "lot_no": "Lot or Batch number",
+                    "shade_no": "Shade or Color code if present",
+                    "quantity": "Numeric quantity value",
+                    "rate": "Unit price/rate",
+                    "gst": "GST percentage or amount for this item",
+                    "item_amount": "Total amount for this specific line item"
+                }
+            ],
+            "other_details": {
+                "additional descriptive key-value pairs for any data not covered above"
             }
         }
         """
@@ -118,16 +128,32 @@ CRITICAL RULES:
         
         raw_response = await llm_service.unified_chat_completion(system_prompt, user_prompt)
         
-        # Try to parse JSON
+        # Try to parse JSON more robustly
         try:
-            # Simple cleanup for common LLM mistakes (Markdown blocks)
-            clean_json = raw_response.strip()
-            if clean_json.startswith("```"):
-                clean_json = clean_json.replace("```json", "").replace("```", "").strip()
+            import re
+            # Try to find content between ```json and ```
+            json_match = re.search(r'```json\s*(.*?)\s*```', raw_response, re.DOTALL)
+            if json_match:
+                clean_json = json_match.group(1).strip()
+            else:
+                # Try to find content between ``` and ```
+                json_match = re.search(r'```\s*(.*?)\s*```', raw_response, re.DOTALL)
+                if json_match:
+                    clean_json = json_match.group(1).strip()
+                else:
+                    # Last resort: find the first { and last }
+                    json_match = re.search(r'({.*})', raw_response, re.DOTALL)
+                    if json_match:
+                        clean_json = json_match.group(1).strip()
+                    else:
+                        clean_json = raw_response.strip()
+            
+            print(f"[DEBUG] Cleaned JSON for parsing: {clean_json[:500]}...")
             return json.loads(clean_json)
         except Exception as e:
             print(f"Structured extraction parse error: {e}")
-            return {"raw_text": raw_response}
+            print(f"[DEBUG] Failed to parse JSON. Raw response: {raw_response[:500]}...")
+            return {"error": "JSON parse error", "raw_text": raw_response}
 
     async def extract_and_parse(self, buffer: bytes, file_name: str, file_type: str) -> Tuple[str, Dict[str, Any]]:
         text = await self.extract_doc(buffer, file_name, file_type)

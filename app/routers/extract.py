@@ -45,7 +45,8 @@ async def extract_document(
             "textLength": len(text),
             "usedTemplate": False,
             "templateId": None,
-            "confidence": None
+            "confidence": None,
+            "document_id": file_name
         }
         
         return {
@@ -58,3 +59,32 @@ async def extract_document(
     except Exception as e:
         print(f"Extraction Route Error: {e}")
         raise HTTPException(status_code=500, detail=f"Document extraction failed: {str(e)}")
+
+@router.post("/export")
+async def export_extraction(
+    data: dict,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    print(f"[DEBUG] Export endpoint hit by user {current_user.userId}")
+    try:
+        from app.utils.excel_exporter import excel_exporter
+        from fastapi.responses import Response
+        
+        # Extract metadata if available
+        document_id = data.get("document_id", "EXTRACTED_DOC")
+        extracted_data = data.get("extracted", data)
+        
+        xlsx_buffer = excel_exporter.export_to_template(extracted_data, document_id)
+        
+        filename = f"GoodsReceipt_{int(time.time())}.xlsx"
+        
+        return Response(
+            content=xlsx_buffer,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+    except Exception as e:
+        print(f"Export Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate Excel: {str(e)}")

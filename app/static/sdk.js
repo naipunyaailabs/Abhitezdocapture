@@ -82,7 +82,14 @@ function flattenObject(obj, prefix = '') {
         if (value && typeof value === 'object' && !Array.isArray(value)) {
             Object.assign(items, flattenObject(value, newKey));
         } else if (Array.isArray(value)) {
-            items[newKey] = value.map(item => typeof item === 'object' ? JSON.stringify(item) : item).join('; ');
+            value.forEach((item, index) => {
+                const arrayKey = `${newKey}.${index}`;
+                if (item && typeof item === 'object') {
+                    Object.assign(items, flattenObject(item, arrayKey));
+                } else {
+                    items[arrayKey] = item;
+                }
+            });
         } else {
             items[newKey] = value;
         }
@@ -90,31 +97,90 @@ function flattenObject(obj, prefix = '') {
     return items;
 }
 
+function updateObjectByPath(obj, path, value) {
+    const parts = path.split('.');
+    let current = obj;
+    for (let i = 0; i < parts.length - 1; i++) {
+        const part = parts[i];
+        // If the path doesn't exist, we skip (should exist since it was flattened from original)
+        if (!current || typeof current !== 'object') return;
+        current = current[part];
+    }
+    if (current && typeof current === 'object') {
+        current[parts[parts.length - 1]] = value;
+    }
+}
+
 function renderAsTable(data) {
     let html = '<div style="overflow-x: auto; margin-top: 1rem;"><table class="prose" style="width: 100%; border-collapse: collapse;">';
-    html += '<thead><tr><th style="background:#fbbf24; color:#000; padding: 1rem; border: 1px solid var(--glass-border); text-align: left;">Field Name</th><th style="background:#fbbf24; color:#000; padding: 1rem; border: 1px solid var(--glass-border); text-align: left;">Extracted Value</th></tr></thead><tbody>';
+    html += '<thead><tr><th style="background:#fbbf24; color:#000; padding: 1rem; border: 1px solid var(--glass-border); text-align: left; width: 35%;">Field Name</th><th style="background:#fbbf24; color:#000; padding: 1rem; border: 1px solid var(--glass-border); text-align: left;">Extracted Value (Editable)</th></tr></thead><tbody>';
 
     const flatData = flattenObject(data);
 
     for (const [key, value] of Object.entries(flatData)) {
-        const displayKey = key.split('.').map(s => s.charAt(0).toUpperCase() + s.slice(1).replace('_', ' ')).join(' > ');
-        html += `<tr><td style="font-weight:700; color:#fbbf24; padding: 0.75rem; border: 1px solid var(--glass-border); font-size: 0.85rem;">${displayKey}</td><td style="padding: 0.75rem; border: 1px solid var(--glass-border); font-size: 0.85rem; color: var(--text-main);">${value === null ? '<span style="color:rgba(255,255,255,0.2)">—</span>' : value}</td></tr>`;
+        const displayKey = key.split('.').map(s => {
+            if (!isNaN(s)) return `Item ${parseInt(s) + 1}`;
+            return s.charAt(0).toUpperCase() + s.slice(1).replace('_', ' ');
+        }).join(' > ');
+
+        const valStr = value === null ? '' : value;
+        const inputHtml = `<textarea class="editable-extraction-field" data-key="${key}" style="width:100%; background:rgba(255,255,255,0.05); color:white; border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:10px; font-family:inherit; font-size:0.9rem; resize:vertical; min-height:45px; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='rgba(255,255,255,0.1)'" spellcheck="false">${valStr}</textarea>`;
+
+        html += `<tr><td style="font-weight:700; color:#fbbf24; padding: 0.75rem; border: 1px solid var(--glass-border); font-size: 0.85rem; vertical-align: top; background: rgba(255,255,255,0.01);">${displayKey}</td><td style="padding: 0.5rem; border: 1px solid var(--glass-border); font-size: 0.85rem; color: var(--text-main);">${inputHtml}</td></tr>`;
     }
     html += '</tbody></table></div>';
     return html;
 }
 
-function exportToExcel() {
+async function exportToExcel() {
     if (!window.currentExportData) return;
-    const flatData = flattenObject(window.currentExportData);
+    const token = localStorage.getItem('token');
 
-    const dataForExcel = Object.entries(flatData)
-        .map(([key, value]) => ({ 'Field': key, 'Value': value }));
+    // Sync edited values back to the data object
+    const fields = document.querySelectorAll('.editable-extraction-field');
+    fields.forEach(field => {
+        const key = field.getAttribute('data-key');
+        const value = field.value;
+        updateObjectByPath(window.currentExportData.extracted || window.currentExportData, key, value);
+    });
 
-    const worksheet = XLSX.utils.json_to_sheet(dataForExcel);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Extraction");
-    XLSX.writeFile(workbook, `Docapture_Extraction_${Date.now()}.xlsx`);
+    // Show loading state
+    const exportBtn = document.getElementById('excel-export-btn');
+    const originalText = exportBtn.innerText;
+    exportBtn.innerText = 'Exporting...';
+    exportBtn.disabled = true;
+
+    try {
+        const response = await fetch(`${API_BASE}/extract/export`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(window.currentExportData)
+        });
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `GoodsReceipt_${Date.now()}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } else {
+            const err = await response.json();
+            alert(err.detail || 'Export failed');
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Network error during export');
+    } finally {
+        exportBtn.innerText = originalText;
+        exportBtn.disabled = false;
+    }
 }
 
 function closeOverlay() {
@@ -131,6 +197,7 @@ function closeOverlay() {
         }
     });
 }
+
 
 function showPreview(event, containerId) {
     const container = document.getElementById(containerId);
@@ -446,17 +513,26 @@ function toggleTheme() {
 
 function updateThemeUI(theme) {
     const btn = document.getElementById('theme-btn');
+    const dashboardBtn = document.getElementById('dashboard-theme-btn');
     const logo = document.querySelector('.logo img');
     const modalLogo = document.querySelector('#login-modal img');
+    const dashboardLogo = document.getElementById('dashboard-logo');
+    const registerLogo = document.getElementById('register-logo');
 
     if (theme === 'light') {
         if (btn) btn.innerHTML = '☀️';
+        if (dashboardBtn) dashboardBtn.innerHTML = '☀️';
         if (logo) logo.src = '/static/assets/docapture-logo.png';
         if (modalLogo) modalLogo.src = '/static/assets/docapture-logo.png';
+        if (dashboardLogo) dashboardLogo.src = '/static/assets/docapture-logo.png';
+        if (registerLogo) registerLogo.src = '/static/assets/docapture-logo.png';
     } else {
         if (btn) btn.innerHTML = '🌙';
+        if (dashboardBtn) dashboardBtn.innerHTML = '🌙';
         if (logo) logo.src = '/static/assets/docapture-dark-logo.png';
         if (modalLogo) modalLogo.src = '/static/assets/docapture-dark-logo.png';
+        if (dashboardLogo) dashboardLogo.src = '/static/assets/docapture-dark-logo.png';
+        if (registerLogo) registerLogo.src = '/static/assets/docapture-dark-logo.png';
     }
 }
 

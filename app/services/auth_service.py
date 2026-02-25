@@ -8,7 +8,6 @@ from app.models.user import UserInDB, UserCreate, UserUpdate
 
 # In-memory stores fallback
 in_memory_users: Dict[str, dict] = {}
-in_memory_sessions: Dict[str, str] = {} # token -> user_id
 
 class AuthService:
     
@@ -18,17 +17,65 @@ class AuthService:
         return base64.b64encode(password.encode('utf-8')).decode('utf-8')
 
     # --- Session Management ---
-    def create_session(self, user_id: str) -> str:
+    # --- Session Management ---
+    async def create_session(self, user_id: str) -> str:
+        db = await get_database()
         token = self.generate_token()
-        in_memory_sessions[token] = user_id
-        return token
+        expires_at = datetime.now() + timedelta(days=7) # 1 week sessions
+        
+        session_doc = {
+            "token": token,
+            "userId": user_id,
+            "createdAt": datetime.now(),
+            "expiresAt": expires_at
+        }
+        
+        try:
+            print(f"[AuthService] Creating session for user: {user_id}")
+            if db is not None:
+                await db.sessions.insert_one(session_doc)
+                print(f"[AuthService] Session saved to DB: {token[:10]}...")
+            else:
+                print(f"[AuthService] ERROR: Database connection is None during create_session")
+            return token
+        except Exception as e:
+            print(f"[AuthService] Error creating session: {e}")
+            return token # Return token anyway as fallback
 
-    def get_user_id_from_token(self, token: str) -> Optional[str]:
-        return in_memory_sessions.get(token)
+    async def get_user_id_from_token(self, token: str) -> Optional[str]:
+        db = await get_database()
+        print(f"[AuthService] Checking token: {token[:10]}...")
+        try:
+            if db is not None:
+                now = datetime.now()
+                session = await db.sessions.find_one({
+                    "token": token,
+                    "expiresAt": {"$gt": now}
+                })
+                if session:
+                    print(f"[AuthService] Session found for user: {session.get('userId')}")
+                    return session.get("userId")
+                else:
+                    # Check if session exists but expired
+                    expired_session = await db.sessions.find_one({"token": token})
+                    if expired_session:
+                        print(f"[AuthService] Session exists but expired at: {expired_session.get('expiresAt')}")
+                    else:
+                        print(f"[AuthService] No session found for token")
+            else:
+                print(f"[AuthService] Database connection is None")
+            return None
+        except Exception as e:
+            print(f"Error getting user from token: {e}")
+            return None
 
-    def invalidate_session(self, token: str):
-        if token in in_memory_sessions:
-            del in_memory_sessions[token]
+    async def invalidate_session(self, token: str):
+        db = await get_database()
+        try:
+            if db is not None:
+                await db.sessions.delete_one({"token": token})
+        except Exception as e:
+            print(f"Error invalidating session: {e}")
 
     def generate_token(self) -> str:
         return str(uuid.uuid4())

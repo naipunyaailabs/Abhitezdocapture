@@ -7,7 +7,8 @@
     <aside class="dashboard-sidebar">
         <div class="sidebar-header">
             <a href="/" class="logo">
-                <img src="/static/assets/docapture-dark-logo.png" alt="Docapture AI" style="height: 32px; width: auto;">
+                <img id="dashboard-logo" src="/static/assets/docapture-logo.png" alt="Docapture AI" style="height: 32px; width: auto;">
+
             </a>
         </div>
         <nav class="sidebar-nav">
@@ -52,6 +53,9 @@
         <header class="dashboard-header">
             <h1 class="page-title">{% block page_title %}Overview{% endblock %}</h1>
             <div class="header-actions">
+                <button class="theme-toggle-btn" onclick="toggleTheme()" id="dashboard-theme-btn" style="margin-right: 1rem; background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); color: var(--text-main); padding: 0.5rem; border-radius: 8px; cursor: pointer; font-size: 1.2rem;">
+                    🌙
+                </button>
                 <div class="user-profile">
                     <div class="avatar">{{ current_user.name[0] }}</div>
                     <div class="user-info">
@@ -338,4 +342,25 @@
         color: #ef4444;
     }
 </style>
+
+<script>
+// Initialize theme on dashboard load
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize theme properly on dashboard
+    const theme = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', theme);
+    
+    // Update dashboard logo and theme button based on current theme
+    const dashboardLogo = document.getElementById('dashboard-logo');
+    const dashboardBtn = document.getElementById('dashboard-theme-btn');
+    
+    if (theme === 'light') {
+        if (dashboardLogo) dashboardLogo.src = '/static/assets/docapture-logo.png';
+        if (dashboardBtn) dashboardBtn.innerHTML = '☀️';
+    } else {
+        if (dashboardLogo) dashboardLogo.src = '/static/assets/docapture-dark-logo.png';
+        if (dashboardBtn) dashboardBtn.innerHTML = '🌙';
+    }
+});
+</script>
 {% endblock %}
