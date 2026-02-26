@@ -2,9 +2,11 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from fastapi.responses import Response
 import time
 import io
+import json
 import openpyxl
 from app.services.deep_parse.deep_parse_service import deep_parse_service
 from app.services.subscription_service import subscription_service
+from app.services.history_service import history_service
 from app.utils.auth import get_current_user
 from app.models.user import UserResponse
 
@@ -24,8 +26,25 @@ async def extract_deep_parse(
                 detail=f"Processing limit reached. {message}. Please upgrade your plan."
             )
         
+        start_time = time.time()
         buffer = await document.read()
+        file_name = document.filename
         result = await deep_parse_service.extract_multi_page(buffer, current_user.userId)
+        
+        processing_time = int((time.time() - start_time) * 1000)
+        
+        # Record history
+        await history_service.create_record({
+            "userId": current_user.userId,
+            "serviceId": "deep-parse",
+            "serviceName": "Deep Parse",
+            "fileName": file_name,
+            "fileSize": len(buffer),
+            "format": "json",
+            "status": "success",
+            "result": "Multi-page extraction successful",
+            "processingTime": processing_time
+        })
         
         # Increment usage after successful processing
         await subscription_service.increment_usage(current_user.userId)
