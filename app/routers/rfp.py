@@ -26,6 +26,14 @@ class CreateRfpRequest(BaseModel):
 async def create_rfp(request: CreateRfpRequest, current_user: UserResponse = Depends(get_current_user)):
     start_time = time.time()
     try:
+        # Check if user can process
+        can_process, sub, message = await subscription_service.can_process(current_user.userId)
+        if not can_process:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Processing limit reached. {message}. Please upgrade your plan."
+            )
+        
         if request.sections and len(request.sections) > 0:
             sections_list = [s.model_dump() for s in request.sections]
             rfp_content = await rfp_service.create_rfp(

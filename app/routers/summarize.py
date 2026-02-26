@@ -19,6 +19,14 @@ async def summarize_document(
     import time
     start_time = time.time()
     try:
+        # Check if user can process
+        can_process, sub, message = await subscription_service.can_process(current_user.userId)
+        if not can_process:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Processing limit reached. {message}. Please upgrade your plan."
+            )
+        
         buffer = await document.read()
         print(f"[summarize] Received file: {document.filename}, size: {len(buffer)}")
         text = await extract_service.extract_doc(buffer, document.filename, document.content_type)

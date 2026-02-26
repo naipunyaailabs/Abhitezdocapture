@@ -16,6 +16,14 @@ async def extract_document(
 ):
     start_time = time.time()
     try:
+        # Check if user can process
+        can_process, sub, message = await subscription_service.can_process(current_user.userId)
+        if not can_process:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Processing limit reached. {message}. Please upgrade your plan."
+            )
+        
         buffer = await document.read()
         file_name = document.filename
         file_type = document.content_type

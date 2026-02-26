@@ -21,6 +21,14 @@ async def compare_quotations(
         raise HTTPException(status_code=400, detail="Please upload at least 2 quotations to compare.")
     
     try:
+        # Check if user can process
+        can_process, sub, message = await subscription_service.can_process(current_user.userId)
+        if not can_process:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Processing limit reached. {message}. Please upgrade your plan."
+            )
+        
         quotation_texts = []
         total_size = 0
         for doc in documents:

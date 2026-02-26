@@ -17,6 +17,14 @@ async def reconcile_bank_account(
 ):
     start_time = time.time()
     try:
+        # Check if user can process
+        can_process, sub, message = await subscription_service.can_process(current_user.userId)
+        if not can_process:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Processing limit reached. {message}. Please upgrade your plan."
+            )
+        
         # Read bank statement
         bank_buffer = await bank_statement.read()
         bank_name = bank_statement.filename
