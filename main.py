@@ -1,17 +1,61 @@
+print("[DEBUG] importing fastapi...")
 from fastapi import FastAPI, Depends, Request, HTTPException
 from contextlib import asynccontextmanager
-
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+
+print("[DEBUG] importing app.config...")
 from app.config import settings
+print("[DEBUG] importing app.database...")
 from app.database import db
-from app.routers import auth, rfp, extract, history, subscription, services, summarize, compare, summarize_rfp, upload, invoice, bank_reconciliation, deep_parse_router
-from app.utils.auth import get_current_user
-from app.services.subscription_service import subscription_service
-from app.services.history_service import history_service
-from app.services.auth_service import auth_service
+print("[DEBUG] Step 1: Routers import start")
+try:
+    print("[DEBUG] 1a: auth")
+    from app.routers import auth
+    print("[DEBUG] 1b: rfp")
+    from app.routers import rfp
+    print("[DEBUG] 1c: extract")
+    from app.routers import extract
+    print("[DEBUG] 1d: history")
+    from app.routers import history
+    print("[DEBUG] 1e: subscription")
+    from app.routers import subscription
+    print("[DEBUG] 1f: services")
+    from app.routers import services
+    print("[DEBUG] 1g: summarize")
+    from app.routers import summarize
+    print("[DEBUG] 1h: compare")
+    from app.routers import compare
+    print("[DEBUG] 1i: summarize_rfp")
+    from app.routers import summarize_rfp
+    print("[DEBUG] 1j: upload")
+    from app.routers import upload
+    print("[DEBUG] 1k: invoice")
+    from app.routers import invoice
+    print("[DEBUG] 1l: bank_reconciliation")
+    from app.routers import bank_reconciliation
+    print("[DEBUG] 1m: deep_parse_router")
+    from app.routers import deep_parse_router
+    print("[DEBUG] 1n: extract_iq_router")
+    from app.routers import extract_iq_router
+    print("[DEBUG] Step 1: Routers import complete")
+except Exception as e:
+    print(f"[ERROR] Failed to import routers at Step 1: {e}")
+    import traceback
+    traceback.print_exc()
+
+print("[DEBUG] importing services...")
+try:
+    from app.services.subscription_service import subscription_service
+    from app.services.history_service import history_service
+    from app.services.auth_service import auth_service
+    print("[DEBUG] services imported successfully")
+except Exception as e:
+    print(f"[ERROR] Failed to import services: {e}")
+
+print("[DEBUG] importing models/uvicorn...")
 from app.models.user import UserResponse
 import uvicorn
 import os
@@ -19,12 +63,16 @@ import os
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    print("[DEBUG] lifespan: Connecting to database...")
     await db.connect_to_database()
+    print("[DEBUG] lifespan: Connected to database.")
     yield
     # Shutdown
     await db.close_database_connection()
 
+print("[DEBUG] main.py: Imports complete. Initializing app...")
 app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
+print("[DEBUG] main.py: App initialized.")
 
 
 # CORS configuration
@@ -50,6 +98,7 @@ app.include_router(invoice.router, prefix="/invoice", tags=["invoice"])
 app.include_router(bank_reconciliation.router, prefix="/reconcile", tags=["reconcile"])
 app.include_router(upload.router, prefix="/upload", tags=["upload"])
 app.include_router(deep_parse_router.router, prefix="/api/deep-parse", tags=["deep-parse"])
+app.include_router(extract_iq_router.router, prefix="/api/extract-iq", tags=["extract-iq"])
 
 # Static files
 static_path = os.path.join(os.path.dirname(__file__), "app/static")
@@ -82,6 +131,16 @@ async def pricing(request: Request):
 @app.get("/enterprise", response_class=HTMLResponse)
 async def enterprise(request: Request):
     return templates.TemplateResponse("enterprise.html", {"request": request})
+
+@app.get("/contact", response_class=HTMLResponse)
+async def contact_page(request: Request):
+    return templates.TemplateResponse("contact.html", {"request": request})
+
+@app.post("/contact/submit")
+async def contact_submit(request: Request):
+    data = await request.json()
+    # TODO: store inquiry in DB or send notification email
+    return {"status": "ok", "message": "Inquiry received"}
 
 @app.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request):
@@ -225,4 +284,5 @@ async def dashboard_settings_page(request: Request):
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=settings.PORT, reload=True)
+    print(f"[DEBUG] main.py: Running uvicorn on 127.0.0.1:{settings.PORT}...")
+    uvicorn.run(app, host="127.0.0.1", port=settings.PORT, reload=False, log_level="info")

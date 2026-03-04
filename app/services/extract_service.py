@@ -2,8 +2,6 @@ import os
 import io
 import uuid
 import base64
-import pytesseract
-from PIL import Image
 from typing import Dict, Any, Tuple
 from app.utils.pdf_parser import pdf_parser
 from app.services.llm_service import llm_service
@@ -60,6 +58,8 @@ class ExtractService:
 
     async def ocr_image(self, buffer: bytes) -> str:
         try:
+            import pytesseract
+            from PIL import Image
             image = Image.open(io.BytesIO(buffer))
             text = pytesseract.image_to_string(image)
             return text.strip()

@@ -31,6 +31,7 @@ class DeepParseModule {
             <div class="dp-container">
                 <div class="dp-header">
                     <div class="dp-header-left">
+                        <div style="font-size: 1rem; font-weight: 600; color: #22c55e; margin-bottom: 0.25rem; letter-spacing: 0.5px;">Powered by DataMatrix</div>
                         <h2 class="dp-title">Structured Data</h2>
                         <p class="dp-subtitle" id="dp-processed-time">Processing...</p>
                     </div>

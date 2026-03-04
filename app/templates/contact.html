@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+
+{% block title %}Contact Us - Docapture AI{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="/static/contact.css">
+
+<!-- Hero Section -->
+<section class="hero" style="padding-bottom: 3rem;">
+    <div class="container">
+        <span class="hero-tag">Get In Touch</span>
+        <h1>Let's Build <span>Together</span></h1>
+        <p>Have questions about our enterprise solutions or need a custom deployment? Our team is ready to help you unlock the full power of document intelligence.</p>
+    </div>
+</section>
+
+<!-- Support Center Cards -->
+<section class="container contact-section">
+    <div class="contact-section-tag">
+        <span class="hero-tag">Support Center</span>
+    </div>
+    <p class="contact-subtitle">Our expert team is on standby to help you with any questions or technical hurdles.</p>
+    
+    <div class="contact-cards-grid">
+        <!-- Email Card -->
+        <div class="contact-card">
+            <div class="contact-icon-wrapper contact-icon-blue">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="4" width="20" height="16" rx="2"/>
+                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                </svg>
+            </div>
+            <h3>Email Channels</h3>
+            <p class="contact-card-desc">Global support within 24 hours</p>
+            <div class="contact-card-detail">
+                <a href="mailto:sales@docapture.com">sales@docapture.com</a>
+            </div>
+        </div>
+
+        <!-- Voice Support Card -->
+        <div class="contact-card">
+            <div class="contact-icon-wrapper contact-icon-green">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                </svg>
+            </div>
+            <h3>Voice Support</h3>
+            <p class="contact-card-desc">Mon-Fri, 9AM-6PM IST</p>
+            <div class="contact-card-detail">
+                <a href="tel:+919346575094">+91 9346575094</a>
+            </div>
+        </div>
+
+        <!-- Live Chat Card -->
+        <div class="contact-card">
+            <div class="contact-icon-wrapper contact-icon-purple">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+            </div>
+            <h3>Live Support</h3>
+            <p class="contact-card-desc">Instantly connect with an agent</p>
+            <div class="contact-card-detail">
+                <button class="btn-launch-chat" onclick="launchChat()">Launch Chat</button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Inquiry Desk Form -->
+<section class="container inquiry-section">
+    <div class="inquiry-form-wrapper">
+        <!-- Decorative circle -->
+        <div class="inquiry-decor-circle"></div>
+        
+        <div class="inquiry-header">
+            <div class="inquiry-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"/>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                </svg>
+            </div>
+            <div>
+                <h2 class="inquiry-title">Inquiry Desk</h2>
+                <p class="inquiry-subtitle-text">Detailed Assistance Form</p>
+            </div>
+        </div>
+
+        <form id="inquiryForm" onsubmit="submitInquiry(event)">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="inquiry-name" placeholder="e.g. Alexander Pierce" required>
+                </div>
+                <div class="form-group">
+                    <label>Email Identifier</label>
+                    <input type="email" id="inquiry-email" placeholder="alex@domain.com" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Inquiry Subject</label>
+                <select id="inquiry-subject" required>
+                    <option value="" disabled selected>Choose a specialized topic</option>
+                    <option value="enterprise">Enterprise Deployment</option>
+                    <option value="integration">API & Integration</option>
+                    <option value="pricing">Custom Pricing</option>
+                    <option value="support">Technical Support</option>
+                    <option value="partnership">Partnership</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Priority Level</label>
+                <div class="priority-selector">
+                    <button type="button" class="priority-btn" data-priority="low" onclick="setPriority(this)">Low</button>
+                    <button type="button" class="priority-btn active" data-priority="medium" onclick="setPriority(this)">Medium</button>
+                    <button type="button" class="priority-btn" data-priority="high" onclick="setPriority(this)">High</button>
+                    <button type="button" class="priority-btn" data-priority="urgent" onclick="setPriority(this)">Urgent</button>
+                </div>
+                <input type="hidden" id="inquiry-priority" value="medium">
+            </div>
+
+            <div class="form-group">
+                <label>Contextual Message</label>
+                <textarea id="inquiry-message" rows="5" placeholder="Please provide comprehensive details about your requirement..." required></textarea>
+            </div>
+
+            <button type="submit" class="btn-premium btn-primary btn-submit" id="inquiry-submit-btn">
+                <span id="submit-text">Send Inquiry</span>
+                <span id="submit-loader" style="display: none;">
+                    <svg class="spinner" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10" stroke-opacity="0.3"/>
+                        <path d="M12 2a10 10 0 0 1 10 10"/>
+                    </svg>
+                    Sending...
+                </span>
+            </button>
+        </form>
+
+        <!-- Success message -->
+        <div id="inquiry-success" class="inquiry-success" style="display: none;">
+            <div class="success-icon">✓</div>
+            <h3>Inquiry Submitted!</h3>
+            <p>We'll get back to you within 24 hours. Check your email for confirmation.</p>
+            <button class="btn-premium btn-outline" onclick="resetForm()" style="margin-top: 1.5rem;">Send Another</button>
+        </div>
+    </div>
+</section>
+
+<!-- FAQ Teaser -->
+<section class="container faq-teaser-section">
+    <p class="faq-teaser-text">Looking for quick answers? Check our frequently asked questions.</p>
+    <a href="/docs" class="btn-premium btn-outline btn-browse-articles">Browse Help Articles</a>
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function setPriority(btn) {
+        document.querySelectorAll('.priority-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('inquiry-priority').value = btn.dataset.priority;
+    }
+
+    function launchChat() {
+        // If you have a chat widget (e.g. Crisp, Intercom, Tawk.to), trigger it here
+        // For now, show an alert
+        if (window.$crisp) {
+            window.$crisp.push(["do", "chat:open"]);
+        } else if (window.Intercom) {
+            window.Intercom('show');
+        } else {
+            alert('Live chat is currently being set up. Please email us at sales@docapture.com in the meantime.');
+        }
+    }
+
+    async function submitInquiry(e) {
+        e.preventDefault();
+        const submitBtn = document.getElementById('inquiry-submit-btn');
+        const submitText = document.getElementById('submit-text');
+        const submitLoader = document.getElementById('submit-loader');
+        
+        submitText.style.display = 'none';
+        submitLoader.style.display = 'flex';
+        submitBtn.disabled = true;
+
+        const payload = {
+            name: document.getElementById('inquiry-name').value,
+            email: document.getElementById('inquiry-email').value,
+            subject: document.getElementById('inquiry-subject').value,
+            priority: document.getElementById('inquiry-priority').value,
+            message: document.getElementById('inquiry-message').value,
+        };
+
+        try {
+            const res = await fetch('/contact/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                document.getElementById('inquiryForm').style.display = 'none';
+                document.getElementById('inquiry-success').style.display = 'flex';
+            } else {
+                const data = await res.json();
+                alert(data.detail || 'Something went wrong. Please try again.');
+            }
+        } catch (err) {
+            alert('Network error. Please try again later.');
+        } finally {
+            submitText.style.display = 'inline';
+            submitLoader.style.display = 'none';
+            submitBtn.disabled = false;
+        }
+    }
+
+    function resetForm() {
+        document.getElementById('inquiryForm').reset();
+        document.getElementById('inquiryForm').style.display = 'block';
+        document.getElementById('inquiry-success').style.display = 'none';
+        // Reset priority
+        document.querySelectorAll('.priority-btn').forEach(b => b.classList.remove('active'));
+        document.querySelector('[data-priority="medium"]').classList.add('active');
+        document.getElementById('inquiry-priority').value = 'medium';
+    }
+</script>
+{% endblock %}

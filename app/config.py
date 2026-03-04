@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     # App Config
     APP_NAME: str = "Docapture API"
     API_V1_STR: str = "/api"
-    PORT: int = 5000
+    PORT: int = 5005
     
     # MongoDB Config
     MONGODB_URI: str = "mongodb://localhost:27017/docapture"

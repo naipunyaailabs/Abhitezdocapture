@@ -7,6 +7,10 @@
 <link rel="stylesheet" href="/static/components/services/deep-parse/deep-parse.css?v=1.1">
 <script src="/static/components/services/deep-parse/deep-parse.js?v=1.4" defer></script>
 
+<!-- ExtractIQ Isolated Assets -->
+<link rel="stylesheet" href="/static/components/services/extract-iq/extract-iq.css?v=1.0">
+<script src="/static/components/services/extract-iq/extract-iq.js?v=1.0" defer></script>
+
 <div class="services-header">
     <p style="color: var(--text-muted); font-size: 1rem;">Upload documents and leverage AI to extract intelligence.</p>
 </div>
@@ -68,23 +72,24 @@
         </form>
     </div>
 
-    <!-- Deep Parse -->
+    <!-- DataMatrix (formerly Deep Parse) -->
     <div class="dash-service-card">
         <div class="dsc-header">
             <div class="dsc-icon" style="background: rgba(34, 197, 94, 0.15);">🔍</div>
             <div>
-                <h3>Deep Parse</h3>
+                <h3>DataMatrix</h3>
                 <span class="dsc-tag">Data Extraction</span>
             </div>
         </div>
-        <p>Convert unstructured multi-page PDFs into clean, structured data tables with side-by-side validation.</p>
-        <form class="dsc-form" id="deep-parse-form"
-            onsubmit="event.preventDefault(); handleDeepParseSubmit();">
+        <p>Upload batches of PDFs and get clean, structured data tables in seconds. Perfect for invoices, delivery notes, and reports — with page-by-page side-by-side validation to ensure zero data loss.</p>
+        <form class="dsc-form" id="deep-parse-form" onsubmit="event.preventDefault(); handleDeepParseSubmit();">
             <div class="form-group">
                 <label>Input Mode</label>
                 <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
-                    <button type="button" class="dp-mode-btn active" id="dp-mode-files" onclick="switchDeepParseMode('files')">📄 Select PDF(s)</button>
-                    <button type="button" class="dp-mode-btn" id="dp-mode-folder" onclick="switchDeepParseMode('folder')">📁 Select Folder</button>
+                    <button type="button" class="dp-mode-btn active" id="dp-mode-files"
+                        onclick="switchDeepParseMode('files')">📄 Select PDF(s)</button>
+                    <button type="button" class="dp-mode-btn" id="dp-mode-folder"
+                        onclick="switchDeepParseMode('folder')">📁 Select Folder</button>
                 </div>
             </div>
             <div class="form-group" id="dp-files-input-group">
@@ -99,6 +104,48 @@
             </div>
             <div id="dp-ext" class="preview-box"></div>
             <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Analyze Multi-Page PDF</button>
+        </form>
+    </div>
+
+
+    <!-- ExtractIQ -->
+    <div class="dash-service-card eiq-card">
+        <div class="dsc-header">
+            <div class="dsc-icon" style="background: rgba(251, 191, 36, 0.15);">🧠</div>
+            <div>
+                <h3>ExtractIQ</h3>
+                <span class="dsc-tag" style="color: #f59e0b; background: rgba(251, 191, 36, 0.1);">Handwritten
+                    Extraction</span>
+            </div>
+        </div>
+        <p>Intelligently capture both handwritten and printed data from any document. Define your own columns — the AI adapts to your schema, maps every field with precision, and delivers editable, export-ready spreadsheets.</p>
+        <form class="dsc-form" id="extract-iq-form" onsubmit="event.preventDefault(); handleExtractIQSubmit();">
+            <div class="form-group">
+                <label>Input Mode</label>
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+                    <button type="button" class="dp-mode-btn active" id="eiq-mode-files"
+                        onclick="switchExtractIQMode('files')" style="border-color: rgba(251, 191, 36, 0.3);">📄 Select
+                        Files</button>
+                    <button type="button" class="dp-mode-btn" id="eiq-mode-folder"
+                        onclick="switchExtractIQMode('folder')" style="border-color: rgba(251, 191, 36, 0.3);">📁 Select
+                        Folder</button>
+                </div>
+            </div>
+            <div class="form-group" id="eiq-files-input-group">
+                <label>Select Document Files</label>
+                <input type="file" id="eiq-input-files" name="document"
+                    accept=".pdf,.jpg,.jpeg,.png,.bmp,.tiff,.tif,.webp" multiple
+                    onchange="showPreview(event, 'eiq-preview')">
+            </div>
+            <div class="form-group" id="eiq-folder-input-group" style="display: none;">
+                <label>Select Folder Containing Documents</label>
+                <input type="file" id="eiq-input-folder" name="document" webkitdirectory directory
+                    onchange="showPreview(event, 'eiq-preview')">
+            </div>
+            <div id="eiq-preview" class="preview-box"></div>
+            <button type="submit" class="btn-premium btn-primary"
+                style="width: 100%; background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #000;">🧠 Define Fields &
+                Extract</button>
         </form>
     </div>
 
@@ -191,6 +238,38 @@
             </div>
             <div id="dp-ledger" class="preview-box"></div>
             <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Start Reconciliation</button>
+        </form>
+    </div>
+    <!-- Deep Parse (View Only) -->
+    <div class="dash-service-card">
+        <div class="dsc-header">
+            <div class="dsc-icon" style="background: rgba(34, 197, 94, 0.15);">🔍</div>
+            <div>
+                <h3>Deep Parse</h3>
+                <span class="dsc-tag">Data Extraction</span>
+            </div>
+        </div>
+        <p>Convert unstructured multi-page PDFs into clean, structured data tables with side-by-side validation.</p>
+        <form class="dsc-form"
+            onsubmit="event.preventDefault(); alert('This service is under maintenance. Please use DataMatrix.');">
+            <div class="form-group">
+                <label>Input Mode</label>
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+                    <button type="button" class="dp-mode-btn active"
+                        onclick="alert('This service is under maintenance. Please use DataMatrix.');">📄 Select
+                        PDF(s)</button>
+                    <button type="button" class="dp-mode-btn"
+                        onclick="alert('This service is under maintenance. Please use DataMatrix.');">📁 Select
+                        Folder</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Select PDF Files</label>
+                <input type="file" name="document" accept=".pdf" multiple
+                    onchange="alert('This service is under maintenance. Please use DataMatrix.');">
+            </div>
+            <div class="preview-box"></div>
+            <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Analyze Multi-Page PDF</button>
         </form>
     </div>
 </div>
@@ -314,10 +393,12 @@
         cursor: pointer;
         transition: all 0.2s;
     }
+
     .dp-mode-btn:hover {
         border-color: var(--primary);
         color: var(--text-main);
     }
+
     .dp-mode-btn.active {
         background: rgba(251, 191, 36, 0.15);
         border-color: var(--primary);
@@ -326,49 +407,95 @@
 </style>
 
 <script>
-function switchDeepParseMode(mode) {
-    const filesGroup = document.getElementById('dp-files-input-group');
-    const folderGroup = document.getElementById('dp-folder-input-group');
-    const btnFiles = document.getElementById('dp-mode-files');
-    const btnFolder = document.getElementById('dp-mode-folder');
-    const preview = document.getElementById('dp-ext');
+    function switchDeepParseMode(mode) {
+        const filesGroup = document.getElementById('dp-files-input-group');
+        const folderGroup = document.getElementById('dp-folder-input-group');
+        const btnFiles = document.getElementById('dp-mode-files');
+        const btnFolder = document.getElementById('dp-mode-folder');
+        const preview = document.getElementById('dp-ext');
 
-    // Clear previews and inputs
-    if (preview) preview.innerHTML = '';
-    document.getElementById('dp-input-files').value = '';
-    document.getElementById('dp-input-folder').value = '';
+        // Clear previews and inputs
+        if (preview) preview.innerHTML = '';
+        document.getElementById('dp-input-files').value = '';
+        document.getElementById('dp-input-folder').value = '';
 
-    if (mode === 'files') {
-        filesGroup.style.display = 'block';
-        folderGroup.style.display = 'none';
-        btnFiles.classList.add('active');
-        btnFolder.classList.remove('active');
-    } else {
-        filesGroup.style.display = 'none';
-        folderGroup.style.display = 'block';
-        btnFiles.classList.remove('active');
-        btnFolder.classList.add('active');
-    }
-}
-
-function handleDeepParseSubmit() {
-    const filesInput = document.getElementById('dp-input-files');
-    const folderInput = document.getElementById('dp-input-folder');
-    const isFilesMode = document.getElementById('dp-mode-files').classList.contains('active');
-
-    let files;
-    if (isFilesMode) {
-        files = filesInput.files;
-    } else {
-        files = folderInput.files;
+        if (mode === 'files') {
+            filesGroup.style.display = 'block';
+            folderGroup.style.display = 'none';
+            btnFiles.classList.add('active');
+            btnFolder.classList.remove('active');
+        } else {
+            filesGroup.style.display = 'none';
+            folderGroup.style.display = 'block';
+            btnFiles.classList.remove('active');
+            btnFolder.classList.add('active');
+        }
     }
 
-    if (!files || files.length === 0) {
-        alert('Please select PDF file(s) or a folder first.');
-        return;
+    function handleDeepParseSubmit() {
+        const filesInput = document.getElementById('dp-input-files');
+        const folderInput = document.getElementById('dp-input-folder');
+        const isFilesMode = document.getElementById('dp-mode-files').classList.contains('active');
+
+        let files;
+        if (isFilesMode) {
+            files = filesInput.files;
+        } else {
+            files = folderInput.files;
+        }
+
+        if (!files || files.length === 0) {
+            alert('Please select PDF file(s) or a folder first.');
+            return;
+        }
+
+        deepParse.processFiles(files);
     }
 
-    deepParse.processFiles(files);
-}
+    // ─── ExtractIQ Handlers ─────────────────────────────
+    function switchExtractIQMode(mode) {
+        const filesGroup = document.getElementById('eiq-files-input-group');
+        const folderGroup = document.getElementById('eiq-folder-input-group');
+        const btnFiles = document.getElementById('eiq-mode-files');
+        const btnFolder = document.getElementById('eiq-mode-folder');
+        const preview = document.getElementById('eiq-preview');
+
+        if (preview) preview.innerHTML = '';
+        document.getElementById('eiq-input-files').value = '';
+        document.getElementById('eiq-input-folder').value = '';
+
+        if (mode === 'files') {
+            filesGroup.style.display = 'block';
+            folderGroup.style.display = 'none';
+            btnFiles.classList.add('active');
+            btnFolder.classList.remove('active');
+        } else {
+            filesGroup.style.display = 'none';
+            folderGroup.style.display = 'block';
+            btnFiles.classList.remove('active');
+            btnFolder.classList.add('active');
+        }
+    }
+
+    function handleExtractIQSubmit() {
+        const filesInput = document.getElementById('eiq-input-files');
+        const folderInput = document.getElementById('eiq-input-folder');
+        const isFilesMode = document.getElementById('eiq-mode-files').classList.contains('active');
+
+        let files;
+        if (isFilesMode) {
+            files = filesInput.files;
+        } else {
+            files = folderInput.files;
+        }
+
+        if (!files || files.length === 0) {
+            alert('Please select document file(s) or a folder first.');
+            return;
+        }
+
+        // Open the field definition setup panel
+        extractIQ.openSetup(files);
+    }
 </script>
 {% endblock %}
