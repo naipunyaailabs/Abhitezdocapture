@@ -76,10 +76,13 @@ print("[DEBUG] main.py: App initialized.")
 
 
 # CORS configuration
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "*")
+_allowed_origins = [o.strip() for o in _raw_origins.split(",")] if _raw_origins != "*" else ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_allowed_origins,
+    allow_credentials=(_allowed_origins != ["*"]),  # credentials only with explicit origins
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -284,5 +287,6 @@ async def dashboard_settings_page(request: Request):
 
 
 if __name__ == "__main__":
-    print(f"[DEBUG] main.py: Running uvicorn on 127.0.0.1:{settings.PORT}...")
-    uvicorn.run(app, host="127.0.0.1", port=settings.PORT, reload=False, log_level="info")
+    host = os.getenv("HOST", "0.0.0.0")  # 0.0.0.0 required for Docker/production
+    print(f"[DEBUG] main.py: Running uvicorn on {host}:{settings.PORT}...")
+    uvicorn.run(app, host=host, port=settings.PORT, reload=False, log_level="info")

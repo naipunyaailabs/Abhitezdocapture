@@ -276,7 +276,8 @@ async function handleLogin(event) {
             }
         }
     } catch (e) {
-        alert('Connection error');
+        console.error('Login fetch error:', e);
+        alert('Connection error: Unable to reach the server. Please try again or refresh the page.');
     } finally {
         btn.innerHTML = originalText;
         btn.disabled = false;
