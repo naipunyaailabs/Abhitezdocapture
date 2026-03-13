@@ -5,7 +5,13 @@ from app.config import settings
 
 class LLMService:
     def __init__(self):
-        self.groq_client = AsyncGroq(api_key=settings.GROQ_API_KEY)
+        self.groq_client = AsyncGroq(
+            api_key=settings.GROQ_API_KEY,
+            http_client=httpx.AsyncClient(
+                verify=False,
+                timeout=60.0
+            )
+        )
         self.ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
     async def unified_chat_completion(

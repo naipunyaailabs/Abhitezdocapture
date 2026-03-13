@@ -80,7 +80,22 @@ class ExtractService:
                 page_text = await self.ocr_image(img_bytes)
                 ocr_text_parts.append(page_text)
             text = "\n\n".join(ocr_text_parts)
-            
+
+            # If OCR also failed (e.g. Tesseract not installed), use vision LLM directly
+            if len(text.strip()) < 50 and images:
+                print("[ExtractService] OCR unavailable, using vision LLM fallback")
+                vision_parts = []
+                for img_bytes in images:
+                    img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+                    page_text = await llm_service.unified_chat_completion(
+                        "You are a document text extractor. Extract ALL visible text from this document image exactly as it appears. Return only the extracted text.",
+                        "Extract all text from this document image.",
+                        image_base64=img_b64,
+                        image_mime_type="image/png"
+                    )
+                    vision_parts.append(page_text)
+                text = "\n\n".join(vision_parts)
+
         return text.strip()
 
     async def structured_extraction(self, text: str) -> Dict[str, Any]:
