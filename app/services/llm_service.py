@@ -42,8 +42,8 @@ class LLMService:
         image_mime_type: str = "image/jpeg",
         max_tokens: int = 4096,
     ) -> str:
-        # Use Llama 4 Maverick for vision (128 experts — higher accuracy), Llama 3.3 for text-only
-        model = "meta-llama/llama-4-maverick-17b-128e-instruct" if image_base64 else "llama-3.3-70b-versatile" 
+        # Use Llama 4 Scout for vision, Llama 3.3 for text-only
+        model = "meta-llama/llama-4-scout-17b-16e-instruct" if image_base64 else "llama-3.3-70b-versatile" 
         
         messages = [{"role": "system", "content": system}]
         
