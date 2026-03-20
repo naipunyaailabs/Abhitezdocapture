@@ -40,6 +40,8 @@ try:
     from app.routers import deep_parse_router
     print("[DEBUG] 1n: extract_iq_router")
     from app.routers import extract_iq_router
+    print("[DEBUG] 1o: register_router")
+    from app.routers import register_router
     print("[DEBUG] Step 1: Routers import complete")
 except Exception as e:
     print(f"[ERROR] Failed to import routers at Step 1: {e}")
@@ -102,6 +104,7 @@ app.include_router(bank_reconciliation.router, prefix="/reconcile", tags=["recon
 app.include_router(upload.router, prefix="/upload", tags=["upload"])
 app.include_router(deep_parse_router.router, prefix="/api/deep-parse", tags=["deep-parse"])
 app.include_router(extract_iq_router.router, prefix="/api/extract-iq", tags=["extract-iq"])
+app.include_router(register_router.router, prefix="/api/register", tags=["register"])
 
 # Static files
 static_path = os.path.join(os.path.dirname(__file__), "app/static")

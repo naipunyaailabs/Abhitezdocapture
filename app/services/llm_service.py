@@ -19,16 +19,17 @@ class LLMService:
         system: str, 
         user: str, 
         image_base64: str = None, 
-        image_mime_type: str = "image/jpeg"
+        image_mime_type: str = "image/jpeg",
+        max_tokens: int = 4096,
     ) -> str:
         client_type = settings.AI_CLIENT
-        print(f"[unified_chat_completion] Using {client_type} client")
+        print(f"[unified_chat_completion] Using {client_type} client, max_tokens={max_tokens}")
 
         try:
             if client_type == "ollama":
-                return await self.ollama_chat_completion(system, user, image_base64, image_mime_type)
+                return await self.ollama_chat_completion(system, user, image_base64, image_mime_type, max_tokens)
             else:
-                return await self.groq_chat_completion(system, user, image_base64, image_mime_type)
+                return await self.groq_chat_completion(system, user, image_base64, image_mime_type, max_tokens)
         except Exception as e:
             print(f"[unified_chat_completion] Error with {client_type} client: {e}")
             raise Exception(f"Failed to process chat request with {client_type} client: {str(e)}")
@@ -38,10 +39,11 @@ class LLMService:
         system: str, 
         user: str, 
         image_base64: str = None, 
-        image_mime_type: str = "image/jpeg"
+        image_mime_type: str = "image/jpeg",
+        max_tokens: int = 4096,
     ) -> str:
-        # Use Llama 4 Scout for vision (multimodal), Llama 3.3 for text-only
-        model = "meta-llama/llama-4-scout-17b-16e-instruct" if image_base64 else "llama-3.3-70b-versatile" 
+        # Use Llama 4 Maverick for vision (128 experts — higher accuracy), Llama 3.3 for text-only
+        model = "meta-llama/llama-4-maverick-17b-128e-instruct" if image_base64 else "llama-3.3-70b-versatile" 
         
         messages = [{"role": "system", "content": system}]
         
@@ -66,8 +68,8 @@ class LLMService:
                 model=model,
                 messages=messages,
                 temperature=0.1,
-                max_tokens=4096,
-                top_p=0.95,
+                max_tokens=max_tokens,
+                top_p=1.0,
                 stream=False,
                 stop=None
             )
@@ -81,7 +83,8 @@ class LLMService:
         system: str, 
         user: str, 
         image_base64: str = None, 
-        image_mime_type: str = "image/jpeg"
+        image_mime_type: str = "image/jpeg",
+        max_tokens: int = 4096,
     ) -> str:
         model = "granite3.2-vision:latest" # Based on TS code
         
@@ -99,7 +102,7 @@ class LLMService:
             "stream": False,
             "options": {
                 "temperature": 0.2,
-                "num_predict": 4096
+                "num_predict": max_tokens
             }
         }
 

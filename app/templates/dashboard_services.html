@@ -11,6 +11,10 @@
 <link rel="stylesheet" href="/static/components/services/extract-iq/extract-iq.css?v=1.0">
 <script src="/static/components/services/extract-iq/extract-iq.js?v=1.0" defer></script>
 
+<!-- Register AI Extractor Isolated Assets -->
+<link rel="stylesheet" href="/static/components/services/register/register.css?v=1.0">
+<script src="/static/components/services/register/register.js?v=1.0" defer></script>
+
 <div class="services-header">
     <p style="color: var(--text-muted); font-size: 1rem;">Upload documents and leverage AI to extract intelligence.</p>
 </div>
@@ -72,6 +76,9 @@
         </form>
     </div>
 
+    {% set restricted_emails = ['ajaykumarb@cognitbotz.com', 'bandelaajay362@gmail.com', 'bharat_k@cognitbotz.com'] %}
+
+    {% if current_user.email|lower in restricted_emails %}
     <!-- DataMatrix (formerly Deep Parse) -->
     <div class="dash-service-card">
         <div class="dsc-header">
@@ -106,8 +113,10 @@
             <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Analyze Multi-Page PDF</button>
         </form>
     </div>
+    {% endif %}
 
 
+    {% if current_user.email|lower in restricted_emails %}
     <!-- ExtractIQ -->
     <div class="dash-service-card eiq-card">
         <div class="dsc-header">
@@ -148,6 +157,46 @@
                 Extract</button>
         </form>
     </div>
+    {% endif %}
+
+    {% if current_user.email|lower in restricted_emails %}
+    <!-- Abhitex Register Extractor -->
+    <div class="dash-service-card reg-card">
+        <div class="dsc-header">
+            <div class="dsc-icon" style="background: rgba(251, 191, 36, 0.15);">📒</div>
+            <div>
+                <h3>Abhitex Register Extractor</h3>
+                <span class="dsc-tag">Table Extraction</span>
+            </div>
+        </div>
+        <p>Extract structured tables from handwritten and printed registers/ledgers. Use your saved templates to instantly map every row with precision and export to Excel.</p>
+        <form class="dsc-form" id="register-form" onsubmit="event.preventDefault(); handleRegisterSubmit();">
+            <div class="form-group">
+                <label>Input Mode</label>
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+                    <button type="button" class="dp-mode-btn active" id="reg-mode-files"
+                        onclick="switchRegisterMode('files')">📄 Select Files</button>
+                    <button type="button" class="dp-mode-btn" id="reg-mode-folder"
+                        onclick="switchRegisterMode('folder')">📁 Select Folder</button>
+                </div>
+            </div>
+            <div class="form-group" id="reg-files-input-group">
+                <label>Select Document Files</label>
+                <input type="file" id="reg-input-files" name="document"
+                    accept=".pdf,.jpg,.jpeg,.png,.bmp,.tiff,.tif,.webp" multiple
+                    onchange="showPreview(event, 'reg-preview')">
+            </div>
+            <div class="form-group" id="reg-folder-input-group" style="display: none;">
+                <label>Select Folder Containing Documents</label>
+                <input type="file" id="reg-input-folder" name="document" webkitdirectory directory
+                    onchange="showPreview(event, 'reg-preview')">
+            </div>
+            <div id="reg-preview" class="preview-box"></div>
+            <button type="submit" class="btn-premium btn-primary"
+                style="width: 100%;">📒 Pick Template &amp; Extract</button>
+        </form>
+    </div>
+    {% endif %}
 
     <!-- RFP Forge -->
     <div class="dash-service-card">
