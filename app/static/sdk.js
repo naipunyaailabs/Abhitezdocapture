@@ -286,6 +286,13 @@ async function handleLogin(event) {
 
 function updateAuthUI() {
     const user = JSON.parse(localStorage.getItem('user'));
+    const token = localStorage.getItem('token');
+    
+    // If we have a token but no cookie, restore it (prevents redirect loops)
+    if (token && !document.cookie.includes('token=')) {
+        document.cookie = `token=${token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
+    }
+
     if (user) {
         const authSection = document.getElementById('auth-section');
         if (authSection) {

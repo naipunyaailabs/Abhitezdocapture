@@ -12,80 +12,46 @@
 <script src="/static/components/services/extract-iq/extract-iq.js?v=1.0" defer></script>
 
 <!-- Register AI Extractor Isolated Assets -->
-<link rel="stylesheet" href="/static/components/services/register/register.css?v=1.0">
-<script src="/static/components/services/register/register.js?v=1.0" defer></script>
+<link rel="stylesheet" href="/static/components/services/register/register.css?v=1.1">
+<script src="/static/components/services/register/register.js?v=1.4" defer></script>
+
+<!-- Waste & Downgrade Isolated Assets -->
+<link rel="stylesheet" href="/static/components/services/waste-downgrade/waste-downgrade.css?v=1.0">
+<script src="/static/components/services/waste-downgrade/waste-downgrade.js?v=1.0" defer></script>
+
+<!-- Lot History Cards Isolated Assets -->
+<link rel="stylesheet" href="/static/components/services/lot-history-cards/lot-history-cards.css?v=1.2">
+<script src="/static/components/services/lot-history-cards/lot-history-cards.js?v=1.2" defer></script>
+
+<!-- Production Sheets Isolated Assets -->
+<link rel="stylesheet" href="/static/components/services/production-sheets/production-sheets.css?v=1.0">
+<script src="/static/components/services/production-sheets/production-sheets.js?v=1.0" defer></script>
 
 <div class="services-header">
     <p style="color: var(--text-muted); font-size: 1rem;">Upload documents and leverage AI to extract intelligence.</p>
 </div>
 
 <div class="dash-services-grid">
-    <!-- Smart Summary -->
+    <!-- Smart Summary 
     <div class="dash-service-card">
-        <div class="dsc-header">
-            <div class="dsc-icon" style="background: rgba(99, 102, 241, 0.15);">📄</div>
-            <div>
-                <h3>Smart Summary</h3>
-                <span class="dsc-tag">AI Summarization</span>
-            </div>
-        </div>
-        <p>Deeply analyze documents and extract core insights. Supports PDF, DOCX, and images.</p>
-        <form class="dsc-form" onsubmit="handleService(event, '/summarize', 'Document Summary')">
-            <div class="form-group">
-                <label>Upload Document</label>
-                <input type="file" name="document" onchange="showPreview(event, 'dp-sm')" required>
-            </div>
-            <div id="dp-sm" class="preview-box"></div>
-            <div class="form-group">
-                <label>Context Prompt <span style="color: var(--text-muted); font-weight:400;">(optional)</span></label>
-                <input type="text" name="prompt" placeholder="e.g., Focus on financial risks">
-            </div>
-            <div class="form-group">
-                <label>Analysis Depth</label>
-                <select name="length">
-                    <option value="short">Brief</option>
-                    <option value="medium" selected>Standard</option>
-                    <option value="detailed">Executive Detailed</option>
-                </select>
-            </div>
-            <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Process Now</button>
-        </form>
+        ...
     </div>
+    -->
 
-    <!-- Vendor Matrix -->
+    <!-- Vendor Matrix
     <div class="dash-service-card">
-        <div class="dsc-header">
-            <div class="dsc-icon" style="background: rgba(251, 191, 36, 0.15);">⚖️</div>
-            <div>
-                <h3>Vendor Matrix</h3>
-                <span class="dsc-tag">Comparison Analysis</span>
-            </div>
-        </div>
-        <p>Automate side-by-side comparison of quotations and vendor proposals.</p>
-        <form class="dsc-form" onsubmit="handleService(event, '/compare-quotations', 'Vendor Comparison')">
-            <div class="form-group">
-                <label>Upload Proposals</label>
-                <input type="file" name="documents" multiple onchange="showPreview(event, 'dp-comp')" required>
-            </div>
-            <div id="dp-comp" class="preview-box"></div>
-            <div class="form-group">
-                <label>Evaluation Criteria</label>
-                <input type="text" name="criteria" placeholder="e.g., pricing, delivery, SLA">
-            </div>
-            <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Generate Matrix</button>
-        </form>
+        ...
     </div>
+    -->
 
-    {% set restricted_emails = ['ajaykumarb@cognitbotz.com', 'bandelaajay362@gmail.com', 'bharat_k@cognitbotz.com'] %}
 
-    {% if current_user.email|lower in restricted_emails %}
-    <!-- DataMatrix (formerly Deep Parse) -->
+    <!-- Invoice Extraction (formerly DataMatrix / Deep Parse) -->
     <div class="dash-service-card">
         <div class="dsc-header">
             <div class="dsc-icon" style="background: rgba(34, 197, 94, 0.15);">🔍</div>
             <div>
-                <h3>DataMatrix</h3>
-                <span class="dsc-tag">Data Extraction</span>
+                <h3>Invoice Extraction</h3>
+                <span class="dsc-tag">Fixed Template</span>
             </div>
         </div>
         <p>Upload batches of PDFs and get clean, structured data tables in seconds. Perfect for invoices, delivery notes, and reports — with page-by-page side-by-side validation to ensure zero data loss.</p>
@@ -113,18 +79,18 @@
             <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Analyze Multi-Page PDF</button>
         </form>
     </div>
-    {% endif %}
 
 
-    {% if current_user.email|lower in restricted_emails %}
+
+
     <!-- ExtractIQ -->
     <div class="dash-service-card eiq-card">
         <div class="dsc-header">
             <div class="dsc-icon" style="background: rgba(251, 191, 36, 0.15);">🧠</div>
             <div>
-                <h3>ExtractIQ</h3>
-                <span class="dsc-tag" style="color: #f59e0b; background: rgba(251, 191, 36, 0.1);">Handwritten
-                    Extraction</span>
+                <h3>Invoice Extraction</h3>
+                <span class="dsc-tag" style="color: #f59e0b; background: rgba(251, 191, 36, 0.1);">Custom
+                    Templates</span>
             </div>
         </div>
         <p>Intelligently capture both handwritten and printed data from any document. Define your own columns — the AI adapts to your schema, maps every field with precision, and delivers editable, export-ready spreadsheets.</p>
@@ -157,9 +123,9 @@
                 Extract</button>
         </form>
     </div>
-    {% endif %}
 
-    {% if current_user.email|lower in restricted_emails %}
+
+
     <!-- Abhitex Register Extractor -->
     <div class="dash-service-card reg-card">
         <div class="dsc-header">
@@ -196,131 +162,150 @@
                 style="width: 100%;">📒 Pick Template &amp; Extract</button>
         </form>
     </div>
-    {% endif %}
 
-    <!-- RFP Forge -->
-    <div class="dash-service-card">
-        <div class="dsc-header">
-            <div class="dsc-icon" style="background: rgba(236, 72, 153, 0.15);">📝</div>
-            <div>
-                <h3>RFP Forge</h3>
-                <span class="dsc-tag">Document Generation</span>
-            </div>
-        </div>
-        <p>Generate high-quality Request for Proposals based on your business requirements.</p>
-        <form class="dsc-form" onsubmit="handleJsonService(event, '/rfp/create', 'RFP Draft')">
-            <div class="form-group">
-                <label>Project Name</label>
-                <input type="text" id="rfp-title" placeholder="Project title" required>
-            </div>
-            <div class="form-group">
-                <label>Organization</label>
-                <input type="text" id="rfp-org" placeholder="Organization name" required>
-            </div>
-            <div class="form-group">
-                <label>Deadline</label>
-                <input type="date" id="rfp-deadline" required>
-            </div>
-            <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Forge RFP</button>
-        </form>
-    </div>
 
-    <!-- RFP Insight -->
-    <div class="dash-service-card">
+    <!-- Waste & Downgrade -->
+    <div class="dash-service-card wd-card">
         <div class="dsc-header">
-            <div class="dsc-icon" style="background: rgba(14, 165, 233, 0.15);">📈</div>
+            <div class="dsc-icon" style="background: rgba(34, 197, 94, 0.15);">♻️</div>
             <div>
-                <h3>RFP Insight</h3>
-                <span class="dsc-tag">RFP Analysis</span>
+                <h3>Waste &amp; Downgrade</h3>
+                <span class="dsc-tag" style="color: #16a34a; background: rgba(34, 197, 94, 0.1);">Fixed Schema</span>
             </div>
         </div>
-        <p>Screen complex RFPs for key requirements, eligibility criteria, and compliance gaps.</p>
-        <form class="dsc-form" onsubmit="handleService(event, '/summarize-rfp', 'RFP Screening Report')">
-            <div class="form-group">
-                <label>RFP Document</label>
-                <input type="file" name="document" onchange="showPreview(event, 'dp-rfp')" required>
-            </div>
-            <div id="dp-rfp" class="preview-box"></div>
-            <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Analyze RFP</button>
-        </form>
-    </div>
-
-    <!-- Invoice Intel -->
-    <div class="dash-service-card">
-        <div class="dsc-header">
-            <div class="dsc-icon" style="background: rgba(234, 179, 8, 0.15);">💰</div>
-            <div>
-                <h3>Invoice Intel</h3>
-                <span class="dsc-tag">Financial Extraction</span>
-            </div>
-        </div>
-        <p>Forensic extraction of invoices: line items, tax IDs, bank details, and payment terms.</p>
-        <form class="dsc-form" onsubmit="handleService(event, '/invoice/extract', 'Invoice Intelligence')">
-            <div class="form-group">
-                <label>Invoice File</label>
-                <input type="file" name="document" onchange="showPreview(event, 'dp-inv')" required>
-            </div>
-            <div id="dp-inv" class="preview-box"></div>
-            <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Audit Invoice</button>
-        </form>
-    </div>
-
-    <!-- Bank Reconciliation -->
-    <div class="dash-service-card">
-        <div class="dsc-header">
-            <div class="dsc-icon" style="background: rgba(16, 185, 129, 0.15);">🏦</div>
-            <div>
-                <h3>Bank Recon</h3>
-                <span class="dsc-tag">Automatic Reconciliation</span>
-            </div>
-        </div>
-        <p>Automatically match bank statements against internal ledgers with 99% accuracy.</p>
-        <form class="dsc-form" onsubmit="handleReconciliation(event)">
-            <div class="form-group">
-                <label>Bank Statement</label>
-                <input type="file" name="bank_statement" onchange="showPreview(event, 'dp-bank')" required>
-            </div>
-            <div id="dp-bank" class="preview-box"></div>
-            <div class="form-group">
-                <label>Internal Ledger</label>
-                <input type="file" name="ledger_file" onchange="showPreview(event, 'dp-ledger')" required>
-            </div>
-            <div id="dp-ledger" class="preview-box"></div>
-            <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Start Reconciliation</button>
-        </form>
-    </div>
-    <!-- Deep Parse (View Only) -->
-    <div class="dash-service-card">
-        <div class="dsc-header">
-            <div class="dsc-icon" style="background: rgba(34, 197, 94, 0.15);">🔍</div>
-            <div>
-                <h3>Deep Parse</h3>
-                <span class="dsc-tag">Data Extraction</span>
-            </div>
-        </div>
-        <p>Convert unstructured multi-page PDFs into clean, structured data tables with side-by-side validation.</p>
-        <form class="dsc-form"
-            onsubmit="event.preventDefault(); alert('This service is under maintenance. Please use DataMatrix.');">
+        <p>Upload handwritten or printed Wastage + Downgrade sheets. The AI captures the page DATE and every row across IO NO, A/B/C/D-GRADE, CHINDI, POUCHA, SELVAGE, PATTI and Total — exported in the original sheet layout.</p>
+        <form class="dsc-form" id="waste-downgrade-form" onsubmit="event.preventDefault(); handleWasteDowngradeSubmit();">
             <div class="form-group">
                 <label>Input Mode</label>
                 <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
-                    <button type="button" class="dp-mode-btn active"
-                        onclick="alert('This service is under maintenance. Please use DataMatrix.');">📄 Select
-                        PDF(s)</button>
-                    <button type="button" class="dp-mode-btn"
-                        onclick="alert('This service is under maintenance. Please use DataMatrix.');">📁 Select
-                        Folder</button>
+                    <button type="button" class="dp-mode-btn active" id="wd-mode-files"
+                        onclick="switchWasteDowngradeMode('files')">📄 Select Files</button>
+                    <button type="button" class="dp-mode-btn" id="wd-mode-folder"
+                        onclick="switchWasteDowngradeMode('folder')">📁 Select Folder</button>
                 </div>
             </div>
-            <div class="form-group">
-                <label>Select PDF Files</label>
-                <input type="file" name="document" accept=".pdf" multiple
-                    onchange="alert('This service is under maintenance. Please use DataMatrix.');">
+            <div class="form-group" id="wd-files-input-group">
+                <label>Select Document Files</label>
+                <input type="file" id="wd-input-files" name="document"
+                    accept=".pdf,.jpg,.jpeg,.png,.bmp,.tiff,.tif,.webp" multiple
+                    onchange="showPreview(event, 'wd-preview')">
             </div>
-            <div class="preview-box"></div>
-            <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Analyze Multi-Page PDF</button>
+            <div class="form-group" id="wd-folder-input-group" style="display: none;">
+                <label>Select Folder Containing Documents</label>
+                <input type="file" id="wd-input-folder" name="document" webkitdirectory directory
+                    onchange="showPreview(event, 'wd-preview')">
+            </div>
+            <div id="wd-preview" class="preview-box"></div>
+            <button type="submit" class="btn-premium btn-primary"
+                style="width: 100%; background: linear-gradient(135deg, #22c55e, #16a34a); color: #fff;">♻️ Extract Waste &amp; Downgrade</button>
         </form>
     </div>
+
+
+    <!-- Lot History Cards Extraction -->
+    <div class="dash-service-card lhc-card">
+        <div class="dsc-header">
+            <div class="dsc-icon" style="background: rgba(99, 102, 241, 0.15);">🧵</div>
+            <div>
+                <h3>Lot History Cards Extraction</h3>
+                <span class="dsc-tag" style="color: #6366f1; background: rgba(99, 102, 241, 0.1);">Fixed Schema</span>
+            </div>
+        </div>
+        <p>Upload handwritten or printed Lot History Card (Grey Folding) forms. The AI captures the header (I.O. No, Dye Lot No, Shade No, Quality M.No) and every roll across Rope 1, Rope 2 and Rope 3 — Roll No, Total Pcs, Wt (kg) and Code — ready for Excel export.</p>
+        <form class="dsc-form" id="lot-history-cards-form" onsubmit="event.preventDefault(); handleLotHistoryCardsSubmit();">
+            <div class="form-group">
+                <label>Input Mode</label>
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+                    <button type="button" class="dp-mode-btn active" id="lhc-mode-files"
+                        onclick="switchLotHistoryCardsMode('files')">📄 Select Files</button>
+                    <button type="button" class="dp-mode-btn" id="lhc-mode-folder"
+                        onclick="switchLotHistoryCardsMode('folder')">📁 Select Folder</button>
+                </div>
+            </div>
+            <div class="form-group" id="lhc-files-input-group">
+                <label>Select Document Files</label>
+                <input type="file" id="lhc-input-files" name="document"
+                    accept=".pdf,.jpg,.jpeg,.png,.bmp,.tiff,.tif,.webp" multiple
+                    onchange="showPreview(event, 'lhc-preview')">
+            </div>
+            <div class="form-group" id="lhc-folder-input-group" style="display: none;">
+                <label>Select Folder Containing Documents</label>
+                <input type="file" id="lhc-input-folder" name="document" webkitdirectory directory
+                    onchange="showPreview(event, 'lhc-preview')">
+            </div>
+            <div id="lhc-preview" class="preview-box"></div>
+            <button type="submit" class="btn-premium btn-primary"
+                style="width: 100%; background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff;">🧵 Extract Lot History Cards</button>
+        </form>
+    </div>
+
+
+    <!-- Production Sheets -->
+    <div class="dash-service-card ps-card">
+        <div class="dsc-header">
+            <div class="dsc-icon" style="background: rgba(20, 184, 166, 0.15);">🧾</div>
+            <div>
+                <h3>Production Sheets</h3>
+                <span class="dsc-tag" style="color: #14b8a6; background: rgba(20, 184, 166, 0.1);">Fixed Schema</span>
+            </div>
+        </div>
+        <p>Upload handwritten or printed daily production sheets (Length Heming, Length Cuting, FNS to Job, Cross Cuting). The AI auto-detects the sheet type and extracts ONLY the green columns — LOT NO, STYLE CODE, IO NUMBER, ShadeCode, TeamCode, PCS, KGS — exported in the original sheet layout.</p>
+        <form class="dsc-form" id="production-sheets-form" onsubmit="event.preventDefault(); handleProductionSheetsSubmit();">
+            <div class="form-group">
+                <label>Input Mode</label>
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+                    <button type="button" class="dp-mode-btn active" id="ps-mode-files"
+                        onclick="switchProductionSheetsMode('files')">📄 Select Files</button>
+                    <button type="button" class="dp-mode-btn" id="ps-mode-folder"
+                        onclick="switchProductionSheetsMode('folder')">📁 Select Folder</button>
+                </div>
+            </div>
+            <div class="form-group" id="ps-files-input-group">
+                <label>Select Document Files</label>
+                <input type="file" id="ps-input-files" name="document"
+                    accept=".pdf,.jpg,.jpeg,.png,.bmp,.tiff,.tif,.webp" multiple
+                    onchange="showPreview(event, 'ps-preview')">
+            </div>
+            <div class="form-group" id="ps-folder-input-group" style="display: none;">
+                <label>Select Folder Containing Documents</label>
+                <input type="file" id="ps-input-folder" name="document" webkitdirectory directory
+                    onchange="showPreview(event, 'ps-preview')">
+            </div>
+            <div id="ps-preview" class="preview-box"></div>
+            <button type="submit" class="btn-premium btn-primary"
+                style="width: 100%; background: linear-gradient(135deg, #14b8a6, #0d9488); color: #fff;">🧾 Extract Production Sheets</button>
+        </form>
+    </div>
+
+
+    <!-- RFP Forge
+    <div class="dash-service-card">
+        ...
+    </div>
+    -->
+
+    <!-- RFP Insight
+    <div class="dash-service-card">
+        ...
+    </div>
+    -->
+
+    <!-- Invoice Intel
+    <div class="dash-service-card">
+        ...
+    </div>
+    -->
+
+    <!-- Bank Recon
+    <div class="dash-service-card">
+        ...
+    </div>
+    -->
+    <!-- Deep Parse (View Only)
+    <div class="dash-service-card">
+        ...
+    </div>
+    -->
 </div>
 
 <style>
@@ -545,6 +530,120 @@
 
         // Open the field definition setup panel
         extractIQ.openSetup(files);
+    }
+
+    // ─── Waste & Downgrade Handlers ─────────────────────────
+    function switchWasteDowngradeMode(mode) {
+        const filesGroup = document.getElementById('wd-files-input-group');
+        const folderGroup = document.getElementById('wd-folder-input-group');
+        const btnFiles = document.getElementById('wd-mode-files');
+        const btnFolder = document.getElementById('wd-mode-folder');
+        const preview = document.getElementById('wd-preview');
+
+        if (preview) preview.innerHTML = '';
+        document.getElementById('wd-input-files').value = '';
+        document.getElementById('wd-input-folder').value = '';
+
+        if (mode === 'files') {
+            filesGroup.style.display = 'block';
+            folderGroup.style.display = 'none';
+            btnFiles.classList.add('active');
+            btnFolder.classList.remove('active');
+        } else {
+            filesGroup.style.display = 'none';
+            folderGroup.style.display = 'block';
+            btnFiles.classList.remove('active');
+            btnFolder.classList.add('active');
+        }
+    }
+
+    function handleWasteDowngradeSubmit() {
+        const filesInput = document.getElementById('wd-input-files');
+        const folderInput = document.getElementById('wd-input-folder');
+        const isFilesMode = document.getElementById('wd-mode-files').classList.contains('active');
+
+        const files = isFilesMode ? filesInput.files : folderInput.files;
+        if (!files || files.length === 0) {
+            alert('Please select document file(s) or a folder first.');
+            return;
+        }
+        wasteDowngrade.processFiles(files);
+    }
+
+    // ─── Lot History Cards Handlers ─────────────────────────
+    function switchLotHistoryCardsMode(mode) {
+        const filesGroup = document.getElementById('lhc-files-input-group');
+        const folderGroup = document.getElementById('lhc-folder-input-group');
+        const btnFiles = document.getElementById('lhc-mode-files');
+        const btnFolder = document.getElementById('lhc-mode-folder');
+        const preview = document.getElementById('lhc-preview');
+
+        if (preview) preview.innerHTML = '';
+        document.getElementById('lhc-input-files').value = '';
+        document.getElementById('lhc-input-folder').value = '';
+
+        if (mode === 'files') {
+            filesGroup.style.display = 'block';
+            folderGroup.style.display = 'none';
+            btnFiles.classList.add('active');
+            btnFolder.classList.remove('active');
+        } else {
+            filesGroup.style.display = 'none';
+            folderGroup.style.display = 'block';
+            btnFiles.classList.remove('active');
+            btnFolder.classList.add('active');
+        }
+    }
+
+    function handleLotHistoryCardsSubmit() {
+        const filesInput = document.getElementById('lhc-input-files');
+        const folderInput = document.getElementById('lhc-input-folder');
+        const isFilesMode = document.getElementById('lhc-mode-files').classList.contains('active');
+
+        const files = isFilesMode ? filesInput.files : folderInput.files;
+        if (!files || files.length === 0) {
+            alert('Please select document file(s) or a folder first.');
+            return;
+        }
+        lotHistoryCards.processFiles(files);
+    }
+
+    // ─── Production Sheets Handlers ─────────────────────────
+    function switchProductionSheetsMode(mode) {
+        const filesGroup = document.getElementById('ps-files-input-group');
+        const folderGroup = document.getElementById('ps-folder-input-group');
+        const btnFiles = document.getElementById('ps-mode-files');
+        const btnFolder = document.getElementById('ps-mode-folder');
+        const preview = document.getElementById('ps-preview');
+
+        if (preview) preview.innerHTML = '';
+        document.getElementById('ps-input-files').value = '';
+        document.getElementById('ps-input-folder').value = '';
+
+        if (mode === 'files') {
+            filesGroup.style.display = 'block';
+            folderGroup.style.display = 'none';
+            btnFiles.classList.add('active');
+            btnFolder.classList.remove('active');
+        } else {
+            filesGroup.style.display = 'none';
+            folderGroup.style.display = 'block';
+            btnFiles.classList.remove('active');
+            btnFolder.classList.add('active');
+        }
+    }
+
+    function handleProductionSheetsSubmit() {
+        const filesInput = document.getElementById('ps-input-files');
+        const folderInput = document.getElementById('ps-input-folder');
+        const isFilesMode = document.getElementById('ps-mode-files').classList.contains('active');
+
+        const files = isFilesMode ? filesInput.files : folderInput.files;
+        if (!files || files.length === 0) {
+            alert('Please select document file(s) or a folder first.');
+            return;
+        }
+        productionSheets.processFiles(files);
     }
 </script>
 {% endblock %}

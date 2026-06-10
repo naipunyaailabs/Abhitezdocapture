@@ -1,0 +1,258 @@
+/* Production Sheets — isolated overlay styles (teal accent) */
+
+.ps-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+.ps-overlay.active { display: flex; }
+
+.ps-container {
+    background: #0f172a;
+    width: 95vw;
+    height: 92vh;
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(20, 184, 166, 0.25);
+}
+
+.ps-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    background: linear-gradient(135deg, rgba(20, 184, 166, 0.12), rgba(13, 148, 136, 0.12));
+    border-bottom: 1px solid rgba(20, 184, 166, 0.2);
+}
+.ps-header-left { display: flex; gap: 0.85rem; align-items: center; }
+.ps-logo-badge {
+    width: 44px; height: 44px;
+    background: rgba(20, 184, 166, 0.15);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.4rem;
+}
+.ps-title { color: #f1f5f9; font-size: 1.2rem; font-weight: 700; margin: 0; }
+.ps-title span { color: #14b8a6; }
+.ps-subtitle { color: #94a3b8; font-size: 0.85rem; margin: 0.15rem 0 0 0; }
+.ps-header-right { display: flex; gap: 0.5rem; }
+.ps-btn-export {
+    background: linear-gradient(135deg, #14b8a6, #0d9488);
+    color: #fff; border: none;
+    padding: 0.55rem 1rem; border-radius: 8px;
+    font-weight: 600; cursor: pointer;
+}
+.ps-btn-close {
+    background: transparent; color: #f1f5f9;
+    border: 1px solid rgba(255,255,255,0.15);
+    width: 36px; height: 36px; border-radius: 8px;
+    font-size: 1.4rem; cursor: pointer;
+}
+
+.ps-main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    padding: 1rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.ps-source-panel, .ps-data-panel {
+    background: #1e293b;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 0.85rem;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.ps-panel-title {
+    color: #cbd5e1;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.ps-page-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-bottom: 0.5rem;
+}
+.ps-tab {
+    padding: 0.3rem 0.7rem;
+    background: rgba(255,255,255,0.04);
+    color: #94a3b8;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 6px;
+    font-size: 0.78rem;
+    cursor: pointer;
+}
+.ps-tab.active {
+    background: rgba(20, 184, 166, 0.18);
+    color: #14b8a6;
+    border-color: rgba(20, 184, 166, 0.4);
+}
+
+.ps-image-viewer {
+    flex: 1;
+    overflow: auto;
+    background: #0b1220;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 0.5rem;
+}
+.ps-image-viewer img {
+    max-width: 100%;
+    border-radius: 6px;
+}
+
+.ps-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+}
+.ps-meta-row label {
+    color: #cbd5e1;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+.ps-meta-row input {
+    flex: 1;
+    min-width: 120px;
+    background: #0b1220;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    color: #f1f5f9;
+    padding: 0.4rem 0.7rem;
+    font-size: 0.85rem;
+}
+.ps-meta-row select {
+    background: #0b1220;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    color: #f1f5f9;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.82rem;
+}
+.ps-sheet-badge {
+    background: rgba(20, 184, 166, 0.15);
+    color: #14b8a6;
+    border: 1px solid rgba(20, 184, 166, 0.35);
+    border-radius: 6px;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.ps-table-toolbar {
+    display: flex;
+    gap: 0.4rem;
+    margin-bottom: 0.5rem;
+}
+.ps-toolbar-btn {
+    padding: 0.35rem 0.7rem;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    color: #cbd5e1;
+    font-size: 0.78rem;
+    cursor: pointer;
+}
+.ps-toolbar-btn.add { background: rgba(20,184,166,0.15); color: #14b8a6; border-color: rgba(20,184,166,0.35); }
+.ps-toolbar-btn.copy { background: rgba(99,102,241,0.15); color: #818cf8; border-color: rgba(99,102,241,0.3); }
+
+.ps-table-wrapper {
+    flex: 1;
+    overflow: auto;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px;
+    background: #0b1220;
+}
+.ps-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+}
+.ps-table th {
+    background: rgba(20,184,166,0.12);
+    color: #f1f5f9;
+    padding: 0.5rem 0.4rem;
+    text-align: left;
+    border-bottom: 1px solid rgba(20,184,166,0.25);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+.ps-table td {
+    padding: 0.35rem 0.4rem;
+    color: #e2e8f0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    min-width: 60px;
+}
+.ps-table td[contenteditable="true"]:focus {
+    outline: 2px solid rgba(20,184,166,0.5);
+    background: rgba(20,184,166,0.06);
+}
+.ps-row-del {
+    background: transparent;
+    color: #ef4444;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0 0.3rem;
+}
+
+.ps-stats-bar {
+    display: flex;
+    justify-content: space-around;
+    padding: 0.5rem;
+    margin-top: 0.5rem;
+    background: rgba(0,0,0,0.2);
+    border-radius: 6px;
+    font-size: 0.78rem;
+    color: #94a3b8;
+}
+.ps-stat span { color: #f1f5f9; font-weight: 600; }
+
+.ps-loading {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.85);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    z-index: 10;
+}
+.ps-spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid rgba(20,184,166,0.2);
+    border-top-color: #14b8a6;
+    border-radius: 50%;
+    animation: ps-spin 0.8s linear infinite;
+}
+@keyframes ps-spin { to { transform: rotate(360deg); } }
+.ps-loading-text { color: #f1f5f9; font-weight: 600; }
+.ps-loading-sub { color: #94a3b8; font-size: 0.85rem; }
+
+@media (max-width: 1100px) {
+    .ps-main { grid-template-columns: 1fr; }
+}

@@ -22,6 +22,8 @@ import os
 from typing import Any, Dict, List, Optional
 
 from PIL import Image, ImageEnhance, ImageFilter
+import cv2
+import numpy as np
 import fitz  # PyMuPDF
 
 from app.services.register_extractor.ocr_engine import ocr_full_page, DEFAULT_COLUMN_HINTS
@@ -39,10 +41,12 @@ from app.services.register_extractor.data_structurer import (
     merge_pages,
     structure_page_result,
 )
+from app.services.register_extractor.row_normalizer import normalize_rows
 
-MAX_LLM_IMAGE_DIM = 1500
-MIN_LLM_IMAGE_DIM = 800
+MAX_LLM_IMAGE_DIM = 2000
+MIN_LLM_IMAGE_DIM = 1200
 MAX_PAGES = 200
+PDF_RENDER_SCALE = 4  # 4x DPI for sharper handwriting (was 3x)
 
 # ── Column pattern validators (used for shift detection) ────────────────────
 import re as _re
@@ -137,20 +141,119 @@ def _detect_and_fix_column_shift(
     return corrected
 
 
+def _detect_rotation(img: Image.Image) -> int:
+    """Detect the dominant orientation of table grid lines.
+
+    Returns the rotation in degrees (0, 90, 180, 270) that should be applied
+    to make the table horizontal (rows running left-to-right, columns top-to-bottom).
+    Uses Hough lines on edges: if vertical lines dominate, the page is sideways.
+    """
+    try:
+        arr = np.array(img.convert("L"))
+        h, w = arr.shape
+
+        # Downsample for speed
+        scale = 800 / max(h, w) if max(h, w) > 800 else 1.0
+        if scale < 1.0:
+            small = cv2.resize(arr, (int(w * scale), int(h * scale)))
+        else:
+            small = arr
+
+        edges = cv2.Canny(small, 50, 150, apertureSize=3)
+        lines = cv2.HoughLines(edges, 1, np.pi / 180, threshold=120)
+
+        if lines is None or len(lines) == 0:
+            # Fallback: if aspect is landscape but typical pages are portrait,
+            # assume it's sideways.
+            return 90 if w > h * 1.2 else 0
+
+        horiz = 0
+        vert = 0
+        for line in lines[:200]:
+            theta = line[0][1]
+            # theta near 0 or pi → vertical line; near pi/2 → horizontal line
+            deg = (theta * 180.0 / np.pi) % 180
+            if deg < 20 or deg > 160:
+                vert += 1
+            elif 70 < deg < 110:
+                horiz += 1
+
+        # If the page has many more vertical lines than horizontal, the table
+        # rows are running top-to-bottom — meaning the page is rotated 90°.
+        # Long horizontal table rows should produce many horizontal lines.
+        # If aspect is landscape AND verticals dominate, rotate 90° CW.
+        if vert > horiz * 1.3 and w < h:
+            # Portrait page with mostly vertical lines → table flowing vertically → rotate 90 CCW
+            return 270
+        if w > h and horiz < vert * 1.3:
+            # Landscape page that doesn't have clear horizontal rows → rotate
+            return 90
+        return 0
+    except Exception as exc:
+        print(f"[RegisterService] rotation detect failed: {exc}")
+        return 0
+
+
+def _crop_to_content(img: Image.Image) -> Image.Image:
+    """Crop to the bounding box of the inked content (the table area)
+    plus a small margin. Removes scanner whitespace that wastes LLM tokens
+    and forces the model to focus on the table.
+    """
+    try:
+        arr = np.array(img.convert("L"))
+        h, w = arr.shape
+        # Threshold: ink is darker than background. Adaptive threshold handles
+        # uneven lighting on photographed pages.
+        _, binary = cv2.threshold(arr, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        # Close small gaps so the table reads as one blob
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
+        closed = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
+        coords = cv2.findNonZero(closed)
+        if coords is None:
+            return img
+        x, y, cw, ch = cv2.boundingRect(coords)
+        # Reject crop if it's too small (probably noise)
+        if cw < w * 0.3 or ch < h * 0.3:
+            return img
+        # Add a small margin
+        margin = max(10, int(min(w, h) * 0.01))
+        x0 = max(0, x - margin)
+        y0 = max(0, y - margin)
+        x1 = min(w, x + cw + margin)
+        y1 = min(h, y + ch + margin)
+        cropped = img.crop((x0, y0, x1, y1))
+        print(f"[RegisterService] Cropped {w}x{h} → {x1 - x0}x{y1 - y0} (removed {100 - int(100 * (x1-x0)*(y1-y0)/(w*h))}% whitespace)")
+        return cropped
+    except Exception as exc:
+        print(f"[RegisterService] crop failed: {exc}")
+        return img
+
+
 def _preprocess_for_llm(img: Image.Image) -> bytes:
     """
     Preprocess image for the Vision LLM:
+    - Auto-rotate so the table is horizontal
+    - Crop to the table content (drop scanner whitespace)
     - Resize so longest side is between MIN and MAX
-    - Light contrast/sharpness boost for handwritten text
-    - Output as JPEG (much smaller than PNG for Groq API limits)
+    - Contrast/sharpness boost for handwritten text
+    - Output as JPEG (much smaller than PNG for API payload limits)
     """
-    w, h = img.size
-
     # Convert to RGB first
     if img.mode in ("RGBA", "P", "LA"):
         img = img.convert("RGB")
     elif img.mode != "RGB":
         img = img.convert("RGB")
+
+    # Auto-rotate so the table reads left-to-right
+    rotation = _detect_rotation(img)
+    if rotation:
+        img = img.rotate(-rotation, expand=True, fillcolor=(255, 255, 255))
+        print(f"[RegisterService] Auto-rotated by {rotation}°")
+
+    # Crop to content
+    img = _crop_to_content(img)
+
+    w, h = img.size
 
     # Upscale very small images
     if max(w, h) < MIN_LLM_IMAGE_DIM:
@@ -167,14 +270,15 @@ def _preprocess_for_llm(img: Image.Image) -> bytes:
         img = img.resize((new_w, new_h), Image.LANCZOS)
         print(f"[RegisterService] Resized image from {w}x{h} → {new_w}x{new_h}")
 
-    # Light enhance for handwritten visibility
-    img = ImageEnhance.Contrast(img).enhance(1.2)
-    img = ImageEnhance.Sharpness(img).enhance(1.3)
+    # Stronger enhance — handwriting in scanned ledgers is faint and blue ink
+    # loses contrast against the printed grid. Boost contrast and sharpness.
+    img = ImageEnhance.Contrast(img).enhance(1.4)
+    img = ImageEnhance.Sharpness(img).enhance(1.6)
 
-    # JPEG is 5-6x smaller than PNG — critical for Groq API payload limits
+    # JPEG is 5-6x smaller than PNG — critical for API payload limits
     buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=85)
-    print(f"[RegisterService] Preprocessed JPEG: {len(buf.getvalue())//1024}KB")
+    img.save(buf, format="JPEG", quality=90)
+    print(f"[RegisterService] Preprocessed JPEG: {len(buf.getvalue())//1024}KB ({img.size[0]}x{img.size[1]})")
     return buf.getvalue()
 
 
@@ -197,22 +301,31 @@ class RegisterExtractorService:
             doc = fitz.open(stream=buffer, filetype="pdf")
             for i, page in enumerate(doc):
                 page_text = page.get_text().strip()
-                pix = page.get_pixmap(matrix=fitz.Matrix(3, 3))
+                pix = page.get_pixmap(matrix=fitz.Matrix(PDF_RENDER_SCALE, PDF_RENDER_SCALE))
                 img_data = pix.tobytes("png")
 
-                # Save full-res PNG for the frontend viewer
+                pil_img = Image.open(io.BytesIO(img_data))
+
+                # Detect rotation once and apply to BOTH the display image and
+                # the LLM image so the frontend viewer matches what the model
+                # actually read. _preprocess_for_llm re-detects from the
+                # already-rotated image (it will return 0) and adds the crop.
+                rotation = _detect_rotation(pil_img)
+                if rotation:
+                    pil_img = pil_img.rotate(-rotation, expand=True, fillcolor=(255, 255, 255))
+                    print(f"[RegisterService] Page {i+1}: rotated by {rotation}° for display")
+
+                # Save the (rotated) full-res PNG for the frontend viewer
                 filename = f"reg_page_{uuid.uuid4().hex[:8]}_{i+1}.png"
                 filepath = os.path.join(self.upload_dir, filename)
-                with open(filepath, "wb") as f:
-                    f.write(img_data)
+                pil_img.save(filepath, format="PNG")
 
                 image_url = f"/static/uploads/register/{filename}"
 
-                # Preprocess for the LLM
-                pil_img = Image.open(io.BytesIO(img_data))
+                # Preprocess for the LLM (will crop + resize; rotation is no-op now)
                 llm_jpg = _preprocess_for_llm(pil_img)
                 llm_b64 = base64.b64encode(llm_jpg).decode("utf-8")
-                print(f"[RegisterService] Page {i+1}: display={len(img_data)//1024}KB, LLM={len(llm_jpg)//1024}KB")
+                print(f"[RegisterService] Page {i+1}: LLM={len(llm_jpg)//1024}KB")
 
                 pages.append({
                     "page_number": i + 1,
@@ -312,6 +425,13 @@ class RegisterExtractorService:
             # Stage 4b: Column shift detection — fix misaligned columns
             if expected_headers and mapped_rows:
                 mapped_rows = _detect_and_fix_column_shift(mapped_rows, expected_headers)
+
+            # Stage 4c: Deterministic normalization — resolve ditto marks
+            # (copy values from row above) and blank cells that violate the
+            # column's digit-count rule. The LLM is asked to do dittos in the
+            # prompt but is unreliable on long pages, so we enforce it here.
+            if mapped_rows:
+                mapped_rows = normalize_rows(mapped_rows, headers)
 
             t_header = time.perf_counter() - t0
 

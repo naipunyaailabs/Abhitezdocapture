@@ -12,16 +12,19 @@ class RegisterExtractorModule {
             templates: [],
             selectedTemplate: null,
             pendingFiles: null,
-            result: null,
-            editableRows: [],
-            headers: [],
-            activePageIndex: 0,
+            // One entry per uploaded file: { filename, result, editableRows, headers,
+            //   activePageIndex, status: 'pending'|'processing'|'success'|'error', error? }
+            results: [],
+            activeResultIndex: 0,
             isLoading: false,
             editingTemplate: null,   // null = create mode, object = edit mode
         };
         this._injected = false;
         this.init();
     }
+
+    // Convenience accessors — operate on the currently selected file's result.
+    get _activeResult() { return this.state.results[this.state.activeResultIndex] || null; }
 
     init() {
         if (!this._injected) {
@@ -56,6 +59,7 @@ class RegisterExtractorModule {
                         <button class="reg-btn-close" onclick="registerExtractor.close()">×</button>
                     </div>
                 </div>
+                <div class="reg-file-tabs" id="reg-file-tabs" style="display:none;"></div>
                 <div class="reg-main" style="position:relative;">
                     <!-- Source Panel -->
                     <div class="reg-source-panel">
@@ -446,42 +450,151 @@ class RegisterExtractorModule {
         this.closePicker();
         const overlay = document.getElementById('reg-overlay');
         overlay.classList.add('active');
-        document.getElementById('reg-loading').classList.add('active');
 
-        const fd = new FormData();
-        fd.append('document', this.state.pendingFiles[0]);
-        fd.append('user_template_id', this.state.selectedTemplate.id);
+        const files = Array.from(this.state.pendingFiles);
+        const total = files.length;
 
-        try {
-            const token = this._getToken();
-            const res = await fetch('/api/register/extract', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` },
-                body: fd,
-            });
-            const json = await res.json();
-            if (!json.success) throw new Error(json.detail || 'Extraction failed');
+        // Reset state for this batch
+        this.state.results = files.map(f => ({
+            filename: f.name,
+            result: null,
+            editableRows: [],
+            headers: [],
+            activePageIndex: 0,
+            status: 'pending',
+        }));
+        this.state.activeResultIndex = 0;
+        this._renderFileTabs();
 
-            const data = json.data;
-            this.state.result = data;
-            this.state.headers = data.headers || [];
-            this.state.editableRows = (data.rows || []).map(r => ({ ...r }));
-            this.state.activePageIndex = 0;
+        // Show file tabs strip only when there are multiple files
+        const fileTabs = document.getElementById('reg-file-tabs');
+        if (fileTabs) fileTabs.style.display = total > 1 ? '' : 'none';
 
-            this._renderResults();
-        } catch (e) {
-            alert('Extraction error: ' + (e.message || 'Unknown error'));
-            overlay.classList.remove('active');
-        } finally {
-            document.getElementById('reg-loading').classList.remove('active');
+        const loadingEl = document.getElementById('reg-loading');
+        const loadingTextEl = loadingEl?.querySelector('.reg-loading-text');
+        const loadingSubEl = loadingEl?.querySelector('.reg-loading-sub');
+        loadingEl?.classList.add('active');
+
+        const token = this._getToken();
+        let firstSuccessShown = false;
+
+        for (let i = 0; i < total; i++) {
+            const file = files[i];
+            this.state.results[i].status = 'processing';
+            this._renderFileTabs();
+
+            if (loadingTextEl) {
+                loadingTextEl.textContent = total > 1
+                    ? `Extracting file ${i + 1} of ${total}...`
+                    : 'Extracting register data...';
+            }
+            if (loadingSubEl) loadingSubEl.textContent = file.name;
+
+            try {
+                const fd = new FormData();
+                fd.append('document', file);
+                fd.append('user_template_id', this.state.selectedTemplate.id);
+
+                const res = await fetch('/api/register/extract', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: fd,
+                });
+                const json = await res.json();
+                if (!res.ok || !json.success) {
+                    throw new Error(json.detail || `Extraction failed (HTTP ${res.status})`);
+                }
+
+                const data = json.data;
+                const pages = data.pages || [];
+                const orderedRows = [];
+                pages.forEach(p => {
+                    (p.rows || []).forEach(r => {
+                        const clone = { ...r };
+                        clone._page = p.page_number;
+                        orderedRows.push(clone);
+                    });
+                });
+
+                this.state.results[i].result = data;
+                this.state.results[i].headers = data.headers || [];
+                this.state.results[i].editableRows = orderedRows;
+                this.state.results[i].activePageIndex = 0;
+                this.state.results[i].status = 'success';
+
+                // Once the first file succeeds, hide the loading overlay so the user
+                // can already interact with that result while the rest stream in.
+                if (!firstSuccessShown) {
+                    firstSuccessShown = true;
+                    this.state.activeResultIndex = i;
+                    loadingEl?.classList.remove('active');
+                    this._renderResults();
+                } else if (this.state.activeResultIndex === i) {
+                    this._renderResults();
+                }
+            } catch (e) {
+                this.state.results[i].status = 'error';
+                this.state.results[i].error = e.message || 'Unknown error';
+                console.error(`[Register] Failed on ${file.name}:`, e);
+            }
+            this._renderFileTabs();
         }
+
+        loadingEl?.classList.remove('active');
+
+        // If every file failed, surface the first error and close.
+        if (!firstSuccessShown) {
+            const firstErr = this.state.results.find(r => r.status === 'error')?.error || 'Extraction failed';
+            alert('Extraction error: ' + firstErr);
+            overlay.classList.remove('active');
+            return;
+        }
+
+        // If some files failed, let the user know how many.
+        const failed = this.state.results.filter(r => r.status === 'error');
+        if (failed.length) {
+            console.warn(`[Register] ${failed.length} of ${total} file(s) failed.`);
+        }
+    }
+
+    _renderFileTabs() {
+        const el = document.getElementById('reg-file-tabs');
+        if (!el) return;
+        const results = this.state.results;
+        if (results.length <= 1) { el.innerHTML = ''; return; }
+        el.innerHTML = results.map((r, i) => {
+            const icon = r.status === 'success' ? '✓'
+                       : r.status === 'error'   ? '✕'
+                       : r.status === 'processing' ? '⏳'
+                       : '·';
+            const cls = [
+                'reg-file-tab',
+                i === this.state.activeResultIndex ? 'active' : '',
+                `status-${r.status}`,
+            ].filter(Boolean).join(' ');
+            const disabled = r.status !== 'success';
+            const title = r.error ? `${r.filename} — ${r.error}` : r.filename;
+            return `<button class="${cls}" ${disabled ? 'disabled' : ''} title="${this._esc(title)}" onclick="registerExtractor.switchFile(${i})">
+                <span class="reg-file-tab-icon">${icon}</span>
+                <span class="reg-file-tab-name">${this._esc(r.filename)}</span>
+            </button>`;
+        }).join('');
+    }
+
+    switchFile(i) {
+        const r = this.state.results[i];
+        if (!r || r.status !== 'success') return;
+        this.state.activeResultIndex = i;
+        this._renderFileTabs();
+        this._renderResults();
     }
 
     // ─── RENDER RESULTS ───────────────────────────────────────────────────────
 
     _renderResults() {
-        const data = this.state.result;
-        const headers = this.state.headers;
+        const active = this._activeResult;
+        if (!active || !active.result) return;
+        const data = active.result;
 
         // Subtitle
         const sub = document.getElementById('reg-subtitle');
@@ -493,35 +606,94 @@ class RegisterExtractorModule {
         document.getElementById('reg-page-count').textContent = data.total_pages || 0;
         document.getElementById('reg-conf').textContent = `${confPct}%`;
 
-        // Page tabs
+        // Page tabs — index 0 = "All", then one tab per page in order
         const tabs = document.getElementById('reg-page-tabs');
         const pages = data.pages || [];
-        tabs.innerHTML = pages.map((p, i) =>
-            `<button class="reg-page-tab${i === 0 ? ' active' : ''}" onclick="registerExtractor._switchPage(${i})">
-                P${p.page_number}
-            </button>`
-        ).join('');
+        const tabsHtml = [
+            `<button class="reg-page-tab${active.activePageIndex === 0 ? ' active' : ''}" onclick="registerExtractor._switchPage(0)">All</button>`,
+            ...pages.map((p, i) =>
+                `<button class="reg-page-tab${active.activePageIndex === i + 1 ? ' active' : ''}" onclick="registerExtractor._switchPage(${i + 1})">P${p.page_number}</button>`
+            ),
+        ];
+        tabs.innerHTML = tabsHtml.join('');
 
-        this._renderImage(0);
-        this._renderTable(this.state.editableRows);
+        const searchEl = document.getElementById('reg-search');
+        if (searchEl) searchEl.value = '';
+
+        this._renderImage(active.activePageIndex);
+        this._renderTable(this._getVisibleRows());
+    }
+
+    _getVisibleRows() {
+        const active = this._activeResult;
+        if (!active) return [];
+        const idx = active.activePageIndex;
+        if (!idx) return active.editableRows;
+        const pages = active.result?.pages || [];
+        const pageNum = pages[idx - 1]?.page_number;
+        if (!pageNum) return active.editableRows;
+
+        const tagged = active.editableRows.filter(r => r._page === pageNum);
+        if (tagged.length) return tagged;
+
+        // Fallback: if rows lack the _page tag (older cached data), slice them
+        // from the canonical array based on per-page row counts.
+        let start = 0;
+        for (let i = 0; i < idx - 1; i++) {
+            start += (pages[i]?.rows || []).length;
+        }
+        const count = (pages[idx - 1]?.rows || []).length;
+        return active.editableRows.slice(start, start + count);
     }
 
     _switchPage(idx) {
-        this.state.activePageIndex = idx;
+        const active = this._activeResult;
+        if (!active) return;
+        active.activePageIndex = idx;
         document.querySelectorAll('.reg-page-tab').forEach((t, i) =>
             t.classList.toggle('active', i === idx));
         this._renderImage(idx);
+        const searchEl = document.getElementById('reg-search');
+        if (searchEl) searchEl.value = '';
+        const visible = this._getVisibleRows();
+        this._renderTable(visible);
+        this._updateStats(visible);
+    }
+
+    _updateStats(visibleRows) {
+        const active = this._activeResult;
+        if (!active) return;
+        const total = active.editableRows.length;
+        const totalPages = (active.result?.pages || []).length;
+        const idx = active.activePageIndex;
+        const rowCountEl = document.getElementById('reg-row-count');
+        const pageCountEl = document.getElementById('reg-page-count');
+        if (rowCountEl) {
+            rowCountEl.textContent = idx === 0
+                ? total
+                : `${visibleRows.length} (of ${total})`;
+        }
+        if (pageCountEl) {
+            pageCountEl.textContent = idx === 0
+                ? totalPages
+                : `${idx} of ${totalPages}`;
+        }
     }
 
     _renderImage(idx) {
-        const pages = this.state.result?.pages || [];
+        const active = this._activeResult;
+        const pages = active?.result?.pages || [];
         const viewer = document.getElementById('reg-image-viewer');
-        if (!pages[idx]) { viewer.innerHTML = ''; return; }
-        viewer.innerHTML = `<img src="${pages[idx].image_url}" alt="Page ${pages[idx].page_number}">`;
+        // idx 0 = "All" — show first page's image as default
+        const pageIdx = idx === 0 ? 0 : idx - 1;
+        if (!pages[pageIdx]) { viewer.innerHTML = ''; return; }
+        viewer.innerHTML = `<img src="${pages[pageIdx].image_url}" alt="Page ${pages[pageIdx].page_number}">`;
     }
 
     _renderTable(rows) {
-        const headers = this.state.headers;
+        const active = this._activeResult;
+        if (!active) return;
+        const headers = active.headers;
         const thead = document.getElementById('reg-thead');
         const tbody = document.getElementById('reg-tbody');
 
@@ -536,43 +708,58 @@ class RegisterExtractorModule {
             tbody.innerHTML = `<tr><td colspan="${headers.length + 1}" style="text-align:center;color:#475569;padding:2rem;">No rows extracted</td></tr>`;
             return;
         }
-        tbody.innerHTML = rows.map((row, ri) => `
+        // Edits must apply to the canonical editableRows array, not the (possibly filtered) view.
+        tbody.innerHTML = rows.map((row, ri) => {
+            const realIdx = active.editableRows.indexOf(row);
+            return `
             <tr>
                 <td class="reg-row-num">${ri + 1}</td>
                 ${headers.map(h =>
-                    `<td><input value="${this._esc(row[h] || '')}" onchange="registerExtractor._updateCell(${ri}, '${this._esc(h)}', this.value)" oninput="registerExtractor._updateCell(${ri}, '${this._esc(h)}', this.value)"></td>`
+                    `<td><input value="${this._esc(row[h] || '')}" onchange="registerExtractor._updateCell(${realIdx}, '${this._esc(h)}', this.value)" oninput="registerExtractor._updateCell(${realIdx}, '${this._esc(h)}', this.value)"></td>`
                 ).join('')}
-            </tr>`).join('');
+            </tr>`;
+        }).join('');
     }
 
     filterRows(search) {
-        const headers = this.state.headers;
+        const active = this._activeResult;
+        if (!active) return;
+        const headers = active.headers;
+        const base = this._getVisibleRows();
         const filtered = search
-            ? this.state.editableRows.filter(row =>
+            ? base.filter(row =>
                 headers.some(h => String(row[h] || '').toLowerCase().includes(search.toLowerCase())))
-            : this.state.editableRows;
+            : base;
         this._renderTable(filtered);
     }
 
     _updateCell(rowIdx, col, value) {
-        if (this.state.editableRows[rowIdx]) {
-            this.state.editableRows[rowIdx][col] = value;
+        const active = this._activeResult;
+        if (active?.editableRows[rowIdx]) {
+            active.editableRows[rowIdx][col] = value;
         }
     }
 
     addRow() {
+        const active = this._activeResult;
+        if (!active) return;
         const blank = {};
-        this.state.headers.forEach(h => { blank[h] = ''; });
-        this.state.editableRows.push(blank);
-        this._renderTable(this.state.editableRows);
-        document.getElementById('reg-row-count').textContent = this.state.editableRows.length;
+        active.headers.forEach(h => { blank[h] = ''; });
+        // Tag new row with the currently viewed page (or 0 for "All")
+        const idx = active.activePageIndex;
+        const pages = active.result?.pages || [];
+        blank._page = idx ? (pages[idx - 1]?.page_number || 0) : 0;
+        active.editableRows.push(blank);
+        this._renderTable(this._getVisibleRows());
+        document.getElementById('reg-row-count').textContent = active.editableRows.length;
     }
 
     copyTable() {
-        if (!this.state.editableRows.length) return;
+        const active = this._activeResult;
+        if (!active?.editableRows.length) return;
         const rows = [
-            this.state.headers.join('\t'),
-            ...this.state.editableRows.map(r => this.state.headers.map(h => r[h] || '').join('\t')),
+            active.headers.join('\t'),
+            ...active.editableRows.map(r => active.headers.map(h => r[h] || '').join('\t')),
         ];
         navigator.clipboard.writeText(rows.join('\n')).then(() => {
             const btn = document.getElementById('reg-copy-btn');
@@ -583,9 +770,32 @@ class RegisterExtractorModule {
     // ─── EXPORT ───────────────────────────────────────────────────────────────
 
     async exportExcel() {
-        if (!this.state.editableRows.length) return;
+        // Combine rows from every successfully-extracted file into a single sheet.
+        // Headers come from the first successful file; if later files use different
+        // headers, their extra columns are appended so no data is lost.
+        const successes = this.state.results.filter(r => r.status === 'success' && r.editableRows.length);
+        if (!successes.length) return;
+
+        const headers = [];
+        const seen = new Set();
+        successes.forEach(r => {
+            (r.headers || []).forEach(h => {
+                if (!seen.has(h)) { seen.add(h); headers.push(h); }
+            });
+        });
+
+        const combinedRows = [];
+        successes.forEach(r => {
+            r.editableRows.forEach(row => {
+                const clean = {};
+                headers.forEach(h => { clean[h] = row[h] || ''; });
+                combinedRows.push(clean);
+            });
+        });
+
         const btn = document.getElementById('reg-export-btn');
         btn.disabled = true;
+        const origText = btn.textContent;
         btn.textContent = '⏳ Exporting...';
         try {
             const token = this._getToken();
@@ -593,9 +803,9 @@ class RegisterExtractorModule {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({
-                    rows: this.state.editableRows,
-                    headers: this.state.headers,
-                    title: `Register_${Date.now()}`,
+                    rows: combinedRows,
+                    headers,
+                    title: `Register_Export_${Date.now()}`,
                 }),
             });
             if (!res.ok) throw new Error('Export failed');
@@ -608,7 +818,7 @@ class RegisterExtractorModule {
             alert(e.message || 'Export error');
         } finally {
             btn.disabled = false;
-            btn.textContent = '📊 Export Excel';
+            btn.textContent = origText;
         }
     }
 
@@ -655,7 +865,6 @@ function handleRegisterSubmit() {
         return;
     }
 
-    // For now use first file (batch support can be added later)
     registerExtractor.open(files);
 }
 

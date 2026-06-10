@@ -15,38 +15,91 @@ class LLMService:
         self.ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
     async def unified_chat_completion(
-        self, 
-        system: str, 
-        user: str, 
-        image_base64: str = None, 
+        self,
+        system: str,
+        user: str,
+        image_base64: str = None,
         image_mime_type: str = "image/jpeg",
         max_tokens: int = 4096,
+        model: str = None,
     ) -> str:
         client_type = settings.AI_CLIENT
-        print(f"[unified_chat_completion] Using {client_type} client, max_tokens={max_tokens}")
+        print(f"[unified_chat_completion] Using {client_type} client, max_tokens={max_tokens}, model={model or 'default'}")
 
         try:
             if client_type == "ollama":
                 return await self.ollama_chat_completion(system, user, image_base64, image_mime_type, max_tokens)
             else:
-                return await self.groq_chat_completion(system, user, image_base64, image_mime_type, max_tokens)
+                return await self.groq_chat_completion(system, user, image_base64, image_mime_type, max_tokens, model=model)
         except Exception as e:
             print(f"[unified_chat_completion] Error with {client_type} client: {e}")
             raise Exception(f"Failed to process chat request with {client_type} client: {str(e)}")
 
-    async def groq_chat_completion(
-        self, 
-        system: str, 
-        user: str, 
-        image_base64: str = None, 
+    async def unified_chat_completion_with_logprobs(
+        self,
+        system: str,
+        user: str,
+        image_base64: str = None,
         image_mime_type: str = "image/jpeg",
         max_tokens: int = 4096,
+        model: str = None,
+    ):
+        """Like unified_chat_completion but also returns real token logprobs.
+
+        Returns (content, token_logprobs). Logprobs are only produced by the
+        Groq backend; Ollama returns None and callers fall back gracefully.
+        """
+        client_type = settings.AI_CLIENT
+        if client_type == "ollama":
+            content = await self.ollama_chat_completion(
+                system, user, image_base64, image_mime_type, max_tokens
+            )
+            return content, None
+        return await self.groq_chat_completion_with_logprobs(
+            system, user, image_base64, image_mime_type, max_tokens,
+            model=model, want_logprobs=True,
+        )
+
+    async def groq_chat_completion(
+        self,
+        system: str,
+        user: str,
+        image_base64: str = None,
+        image_mime_type: str = "image/jpeg",
+        max_tokens: int = 4096,
+        model: str = None,
     ) -> str:
-        # Use Llama 4 Scout for vision, Llama 3.3 for text-only
-        model = "meta-llama/llama-4-scout-17b-16e-instruct" if image_base64 else "llama-3.3-70b-versatile" 
-        
+        content, _ = await self.groq_chat_completion_with_logprobs(
+            system, user, image_base64, image_mime_type, max_tokens,
+            model=model, want_logprobs=False,
+        )
+        return content
+
+    async def groq_chat_completion_with_logprobs(
+        self,
+        system: str,
+        user: str,
+        image_base64: str = None,
+        image_mime_type: str = "image/jpeg",
+        max_tokens: int = 4096,
+        model: str = None,
+        want_logprobs: bool = True,
+    ):
+        """Return (content, token_logprobs).
+
+        token_logprobs is a list of {"token": str, "logprob": float} in the
+        order the model emitted them, or None when logprobs were not requested
+        or not available. These are REAL per-token confidences from the model
+        and are used to score how certain each extracted value is.
+        """
+        # Caller may override the model (e.g. register OCR uses Maverick for
+        # higher accuracy on handwriting). Otherwise default: Scout for vision,
+        # 3.3 for text-only.
+        if not model:
+            model = "meta-llama/llama-4-scout-17b-16e-instruct" if image_base64 else "llama-3.3-70b-versatile"
+
         messages = [{"role": "system", "content": system}]
-        
+
         if image_base64:
             messages.append({
                 "role": "user",
@@ -63,20 +116,43 @@ class LLMService:
         else:
             messages.append({"role": "user", "content": user})
 
+        kwargs = dict(
+            model=model,
+            messages=messages,
+            temperature=0.1,
+            max_tokens=max_tokens,
+            top_p=1.0,
+            stream=False,
+            stop=None,
+        )
+        if want_logprobs:
+            kwargs["logprobs"] = True
+
         try:
-            completion = await self.groq_client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=0.1,
-                max_tokens=max_tokens,
-                top_p=1.0,
-                stream=False,
-                stop=None
-            )
-            return completion.choices[0].message.content
+            completion = await self.groq_client.chat.completions.create(**kwargs)
         except Exception as e:
-            print(f"[groq_chat_completion] Error: {e}")
-            raise
+            # Some models reject logprobs; degrade gracefully to a plain call.
+            if want_logprobs:
+                print(f"[groq_chat_completion_with_logprobs] logprobs failed ({e}); retrying without.")
+                kwargs.pop("logprobs", None)
+                completion = await self.groq_client.chat.completions.create(**kwargs)
+            else:
+                print(f"[groq_chat_completion] Error: {e}")
+                raise
+
+        choice = completion.choices[0]
+        content = choice.message.content
+
+        token_logprobs = None
+        lp = getattr(choice, "logprobs", None)
+        content_lp = getattr(lp, "content", None) if lp else None
+        if content_lp:
+            token_logprobs = [
+                {"token": t.token, "logprob": t.logprob}
+                for t in content_lp
+            ]
+
+        return content, token_logprobs
 
     async def ollama_chat_completion(
         self, 

@@ -17,7 +17,6 @@ class AuthService:
         return base64.b64encode(password.encode('utf-8')).decode('utf-8')
 
     # --- Session Management ---
-    # --- Session Management ---
     async def create_session(self, user_id: str) -> str:
         db = await get_database()
         token = self.generate_token()
@@ -33,13 +32,23 @@ class AuthService:
         try:
             print(f"[AuthService] Creating session for user: {user_id}")
             if db is not None:
-                await db.sessions.insert_one(session_doc)
-                print(f"[AuthService] Session saved to DB: {token[:10]}...")
+                # Ensure sessions collection exists with proper indexes
+                try:
+                    # Create TTL index to automatically remove expired sessions
+                    await db.sessions.create_index("expiresAt", expireAfterSeconds=0)
+                    print(f"[AuthService] TTL index ensured for sessions collection")
+                except Exception as index_err:
+                    print(f"[AuthService] Index creation note: {index_err}")
+                
+                result = await db.sessions.insert_one(session_doc)
+                print(f"[AuthService] Session saved to DB with ID: {result.inserted_id}, token: {token[:10]}...")
             else:
                 print(f"[AuthService] ERROR: Database connection is None during create_session")
             return token
         except Exception as e:
-            print(f"[AuthService] Error creating session: {e}")
+            print(f"[AuthService] CRITICAL Error creating session: {e}")
+            import traceback
+            traceback.print_exc()
             return token # Return token anyway as fallback
 
     async def get_user_id_from_token(self, token: str) -> Optional[str]:
@@ -48,6 +57,13 @@ class AuthService:
         try:
             if db is not None:
                 now = datetime.now()
+                print(f"[AuthService] Querying sessions collection for token in DB...")
+                
+                # First, try to find any session with this token (for debugging)
+                all_token_docs = await db.sessions.find({"token": token}).to_list(length=10)
+                print(f"[AuthService] Found {len(all_token_docs)} session(s) with token (any status)")
+                
+                # Now try to find valid (non-expired) session
                 session = await db.sessions.find_one({
                     "token": token,
                     "expiresAt": {"$gt": now}
@@ -59,14 +75,19 @@ class AuthService:
                     # Check if session exists but expired
                     expired_session = await db.sessions.find_one({"token": token})
                     if expired_session:
-                        print(f"[AuthService] Session exists but expired at: {expired_session.get('expiresAt')}")
+                        print(f"[AuthService] Session exists but expired at: {expired_session.get('expiresAt')} (current time: {now})")
                     else:
-                        print(f"[AuthService] No session found for token")
+                        print(f"[AuthService] No session found for token in database")
+                        # Debug: List all sessions
+                        all_sessions = await db.sessions.find({}).to_list(length=100)
+                        print(f"[AuthService] Total sessions in database: {len(all_sessions)}")
             else:
                 print(f"[AuthService] Database connection is None")
             return None
         except Exception as e:
-            print(f"Error getting user from token: {e}")
+            print(f"[AuthService] Error getting user from token: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
     async def invalidate_session(self, token: str):

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Header, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Header, Depends, HTTPException, BackgroundTasks, Response
 from datetime import datetime, timedelta
 from app.models.user import UserCreate, LoginRequest, RegisterResponse, LoginResponse, VerifyEmailRequest, UserResponse, UserUpdate
 from app.services.auth_service import auth_service
@@ -10,7 +10,7 @@ from typing import Optional
 router = APIRouter()
 
 @router.post("/register", response_model=RegisterResponse, status_code=201)
-async def register(user_create: UserCreate, background_tasks: BackgroundTasks):
+async def register(user_create: UserCreate, background_tasks: BackgroundTasks, response: Response):
     existing_user = await auth_service.find_user_by_email(user_create.email)
     if existing_user:
         raise HTTPException(status_code=409, detail="User with this email already exists")
@@ -34,6 +34,16 @@ async def register(user_create: UserCreate, background_tasks: BackgroundTasks):
     
     token = await auth_service.create_session(user.userId)
     
+    # Set cookie for server-rendered pages
+    response.set_cookie(
+        key="token", 
+        value=token, 
+        max_age=60 * 60 * 24 * 7, # 1 week
+        path="/",
+        samesite="lax",
+        httponly=False # Must be accessible by sdk.js
+    )
+    
     return RegisterResponse(
         token=token,
         user=UserResponse.from_orm(user),
@@ -41,7 +51,7 @@ async def register(user_create: UserCreate, background_tasks: BackgroundTasks):
     )
 
 @router.post("/login", response_model=LoginResponse)
-async def login(login_req: LoginRequest):
+async def login(login_req: LoginRequest, response: Response):
     user = await auth_service.find_user_by_email(login_req.email)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -58,6 +68,16 @@ async def login(login_req: LoginRequest):
     await auth_service.update_user(user.userId, {"lastLoginAt": datetime.now()})
 
     token = await auth_service.create_session(user.userId)
+    
+    # Set cookie for server-rendered pages
+    response.set_cookie(
+        key="token", 
+        value=token, 
+        max_age=60 * 60 * 24 * 7, # 1 week
+        path="/",
+        samesite="lax",
+        httponly=False
+    )
     
     return LoginResponse(
         token=token,

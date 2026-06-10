@@ -1,3 +1,4 @@
+
 print("[DEBUG] importing fastapi...")
 from fastapi import FastAPI, Depends, Request, HTTPException
 from contextlib import asynccontextmanager
@@ -9,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 print("[DEBUG] importing app.config...")
 from app.config import settings
 print("[DEBUG] importing app.database...")
-from app.database import db
+from app.database import db, get_database
 print("[DEBUG] Step 1: Routers import start")
 try:
     print("[DEBUG] 1a: auth")
@@ -42,6 +43,12 @@ try:
     from app.routers import extract_iq_router
     print("[DEBUG] 1o: register_router")
     from app.routers import register_router
+    print("[DEBUG] 1p: waste_downgrade_router")
+    from app.routers import waste_downgrade_router
+    print("[DEBUG] 1q: lot_history_cards_router")
+    from app.routers import lot_history_cards_router
+    print("[DEBUG] 1r: production_sheets_router")
+    from app.routers import production_sheets_router
     print("[DEBUG] Step 1: Routers import complete")
 except Exception as e:
     print(f"[ERROR] Failed to import routers at Step 1: {e}")
@@ -105,6 +112,9 @@ app.include_router(upload.router, prefix="/upload", tags=["upload"])
 app.include_router(deep_parse_router.router, prefix="/api/deep-parse", tags=["deep-parse"])
 app.include_router(extract_iq_router.router, prefix="/api/extract-iq", tags=["extract-iq"])
 app.include_router(register_router.router, prefix="/api/register", tags=["register"])
+app.include_router(waste_downgrade_router.router, prefix="/api/waste-downgrade", tags=["waste-downgrade"])
+app.include_router(lot_history_cards_router.router, prefix="/api/lot-history-cards", tags=["lot-history-cards"])
+app.include_router(production_sheets_router.router, prefix="/api/production-sheets", tags=["production-sheets"])
 
 # Static files
 static_path = os.path.join(os.path.dirname(__file__), "app/static")
@@ -128,19 +138,19 @@ async def robots():
 
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request, "index.html")
 
 @app.get("/pricing", response_class=HTMLResponse)
 async def pricing(request: Request):
-    return templates.TemplateResponse("pricing.html", {"request": request})
+    return templates.TemplateResponse(request, "pricing.html")
 
 @app.get("/enterprise", response_class=HTMLResponse)
 async def enterprise(request: Request):
-    return templates.TemplateResponse("enterprise.html", {"request": request})
+    return templates.TemplateResponse(request, "enterprise.html")
 
 @app.get("/contact", response_class=HTMLResponse)
 async def contact_page(request: Request):
-    return templates.TemplateResponse("contact.html", {"request": request})
+    return templates.TemplateResponse(request, "contact.html")
 
 @app.post("/contact/submit")
 async def contact_submit(request: Request):
@@ -150,23 +160,23 @@ async def contact_submit(request: Request):
 
 @app.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request):
-    return templates.TemplateResponse("register.html", {"request": request})
+    return templates.TemplateResponse(request, "register.html")
 
 @app.get("/verify-email-sent", response_class=HTMLResponse)
 async def verify_email_sent_page(request: Request, email: str = ""):
-    return templates.TemplateResponse("verify_email_sent.html", {"request": request, "email": email})
+    return templates.TemplateResponse(request, "verify_email_sent.html", {"email": email})
 
 @app.get("/verify-email", response_class=HTMLResponse)
 async def verify_email_page(request: Request, token: str = ""):
     if not token:
-        return templates.TemplateResponse("verify_email.html", {
-            "request": request, "success": False, "error": "No verification token provided."
+        return templates.TemplateResponse(request, "verify_email.html", {
+            "success": False, "error": "No verification token provided."
         })
     
     user = await auth_service.find_user_by_verification_token(token)
     if not user:
-        return templates.TemplateResponse("verify_email.html", {
-            "request": request, "success": False, "error": "Invalid or expired verification token."
+        return templates.TemplateResponse(request, "verify_email.html", {
+            "success": False, "error": "Invalid or expired verification token."
         })
     
     await auth_service.update_user(user.userId, {
@@ -175,8 +185,8 @@ async def verify_email_page(request: Request, token: str = ""):
         "emailVerificationTokenExpiry": None
     })
     
-    return templates.TemplateResponse("verify_email.html", {
-        "request": request, "success": True
+    return templates.TemplateResponse(request, "verify_email.html", {
+        "success": True
     })
 
 
@@ -184,16 +194,24 @@ async def verify_email_page(request: Request, token: str = ""):
 
 async def get_dashboard_context(request: Request, active_page: str):
     """Helper to build shared dashboard template context from cookie/header token."""
+    print(f"[Dashboard] get_dashboard_context called for page: {active_page}")
+    print(f"[Dashboard] Request cookies: {list(request.cookies.keys())}")
+    
     token = request.cookies.get("token") or request.query_params.get("token")
     if not token:
+        print(f"[Dashboard] ERROR: No token found in cookies or query params")
         return None
     
+    print(f"[Dashboard] Found token in request: {token[:10]}...")
     user_id = await auth_service.get_user_id_from_token(token)
     if not user_id:
+        print(f"[Dashboard] ERROR: No user found for token")
         return None
-
+    
+    print(f"[Dashboard] User ID found: {user_id}")
     user = await auth_service.find_user_by_id(user_id)
     if not user:
+        print(f"[Dashboard] ERROR: User not found in database")
         return None
     
     sub = await subscription_service.get_user_subscription(user_id)
@@ -220,14 +238,29 @@ async def dashboard_page(request: Request):
     if not ctx:
         return RedirectResponse("/?login=true", status_code=302)
     
-    user_id = ctx["current_user"].userId
-    analytics = await history_service.get_analytics(user_id, 30)
-    history_data = await history_service.get_user_history(user_id, 10)
+    # Get recent history
+    db_conn = await get_database()
+    history = []
+    if db_conn is not None:
+        cursor = db_conn.history.find({"userId": ctx["current_user"].userId}).sort("processedAt", -1).limit(5)
+        history = await cursor.to_list(length=5)
     
-    ctx["analytics"] = analytics or {"totalProcessed": 0, "successCount": 0, "errorCount": 0, "days": 30}
-    ctx["history"] = history_data or []
-    
-    return templates.TemplateResponse("dashboard.html", ctx)
+    # Get analytics
+    analytics = {
+        "totalProcessed": 0,
+        "successCount": 0,
+        "errorCount": 0
+    }
+    if db_conn is not None:
+        analytics["totalProcessed"] = await db_conn.history.count_documents({"userId": ctx["current_user"].userId})
+        analytics["successCount"] = await db_conn.history.count_documents({"userId": ctx["current_user"].userId, "status": "success"})
+        analytics["errorCount"] = await db_conn.history.count_documents({"userId": ctx["current_user"].userId, "status": "error"})
+
+    ctx.update({
+        "history": history,
+        "analytics": analytics
+    })
+    return templates.TemplateResponse(request, "dashboard.html", ctx)
 
 
 @app.get("/dashboard/services", response_class=HTMLResponse)
@@ -235,15 +268,15 @@ async def dashboard_services_page(request: Request):
     ctx = await get_dashboard_context(request, "services")
     if not ctx:
         return RedirectResponse("/?login=true", status_code=302)
-    return templates.TemplateResponse("dashboard_services.html", ctx)
+    return templates.TemplateResponse(request, "dashboard_services.html", ctx)
 
 
-@app.get("/dashboard/integrations", response_class=HTMLResponse)
-async def dashboard_integrations_page(request: Request):
-    ctx = await get_dashboard_context(request, "integrations")
-    if not ctx:
-        return RedirectResponse("/?login=true", status_code=302)
-    return templates.TemplateResponse("dashboard_integrations.html", ctx)
+# @app.get("/dashboard/integrations", response_class=HTMLResponse)
+# async def dashboard_integrations_page(request: Request):
+#     ctx = await get_dashboard_context(request, "integrations")
+#     if not ctx:
+#         return RedirectResponse("/?login=true", status_code=302)
+#     return templates.TemplateResponse("dashboard_integrations.html", ctx)
 
 
 @app.get("/dashboard/analytics", response_class=HTMLResponse)
@@ -278,7 +311,7 @@ async def dashboard_analytics_page(request: Request):
     
     ctx["service_usage"] = service_usage
     
-    return templates.TemplateResponse("dashboard_analytics.html", ctx)
+    return templates.TemplateResponse(request, "dashboard_analytics.html", ctx)
 
 
 @app.get("/dashboard/settings", response_class=HTMLResponse)
@@ -286,7 +319,7 @@ async def dashboard_settings_page(request: Request):
     ctx = await get_dashboard_context(request, "settings")
     if not ctx:
         return RedirectResponse("/?login=true", status_code=302)
-    return templates.TemplateResponse("dashboard_settings.html", ctx)
+    return templates.TemplateResponse(request, "dashboard_settings.html", ctx)
 
 
 if __name__ == "__main__":

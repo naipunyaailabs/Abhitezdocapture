@@ -14,6 +14,12 @@ from typing import Dict, List, Optional
 
 from app.services.llm_service import llm_service
 
+# Vision model for register OCR. Scout is the proven default; Maverick was
+# tried but caused the fabrication detector to discard pages with many ditto
+# marks (it reads them as literal "do" and the detector flagged the repetition).
+# Stay on Scout until the detector/normalizer pipeline is hardened for Maverick.
+REGISTER_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+
 
 # ── Domain-specific system prompt for Indian textile factory registers ────────
 # Provides the model with pattern knowledge about the exact register types
@@ -59,7 +65,23 @@ OCR_SYSTEM = (
     "5. Real data is NEVER sequential (A,B,C or 1,2,3 or E201,E202,E203).\n"
     "6. Skip total/summary rows at the bottom.\n"
     "7. If you cannot read a cell, use \"\".\n"
-    "8. If you cannot read ANY content, return {\"headers\":[], \"rows\":[], \"confidence\":0}.\n\n"
+    "8. If you cannot read ANY content, return {\"headers\":[], \"rows\":[], \"confidence\":0}.\n"
+    "9. DIGIT COUNT — DO NOT ADD OR REMOVE DIGITS:\n"
+    "   - IO Number / Lot No / R.No: EXACTLY 5 digits. If you see '85017', output '85017' — NEVER '285017' or '850170'.\n"
+    "   - Style Code: 5 OR 6 digits. If you see '117939', output '117939' — NEVER '1174939' or '11793'.\n"
+    "   - Do NOT prepend the row number (#) or any neighboring value onto a cell.\n"
+    "   - Do NOT merge two adjacent cells into one number.\n"
+    "   - Count the digits in the handwriting BEFORE writing the value. A 5-digit number has 5 digits, not 6.\n"
+    "10. DITTO/REPEAT MARKS: when a cell contains a ditto/repeat mark — 'do', "
+    "'do.', '\"', '〃', ',,', '-do-' — it means 'same as the cell directly ABOVE'. "
+    "Output the LITERAL token 'do' for that cell EXACTLY as written. Do NOT try "
+    "to resolve it yourself by copying the value above, and do NOT blank it. A "
+    "later deterministic step copies the value down reliably; your job is only to "
+    "FAITHFULLY MARK which cells are dittos by writing 'do'. This applies to "
+    "EVERY column independently, including number columns (IO Number, Style Code, "
+    "Team Code): if the ink shows 'do', write 'do', not a number and not \"\".\n"
+    "11. Distinguish a ditto from a blank: only write 'do' when you actually see a "
+    "ditto mark in the ink. A truly empty cell is still \"\".\n\n"
 
     "OUTPUT FORMAT — Return ONLY valid JSON, no other text:\n"
     "{\n"
@@ -212,22 +234,42 @@ def _is_sequential_prefixed(values: List[str]) -> bool:
 
 
 def _all_identical(values: List[str]) -> bool:
-    """Check if all non-empty values are suspiciously identical.
-    
-    Excludes: dates (contain /), short codes (< 3 chars), party names.
-    Only flags if 5+ identical values of a suspicious type.
+    """Check if a column contains values that are suspiciously identical AND
+    look like obvious filler / placeholder text — NOT legitimate repeated codes.
+
+    Indian textile registers often have many rows sharing the same IO Number,
+    Lot No, Style Code, Team Code, etc. because one batch produces many pieces.
+    Those are real data, not hallucinations. So we only flag identical values
+    that look like generic placeholders (single letters/digits, repeated 'x'es,
+    obvious junk like 'aaaa') — NOT real-looking codes.
     """
-    cleaned = [v.strip() for v in values if v.strip()]
-    if len(cleaned) < 5 or len(set(cleaned)) != 1:
+    # Strip ditto tokens — those are legitimate cell content in handwritten
+    # registers ("do" = same as above) and get resolved after OCR by the
+    # row normalizer. We do NOT want them to trigger the fabrication detector.
+    _DITTO_LITERALS = {
+        "do", "do.", "do,", "do-", "ditto", "d/o", "d.o", "d.o.",
+        '"', '"', '"', "''", "〃", ",,", ",,,", "—do—", "-do-",
+        "same", "same as above", "as above",
+    }
+    cleaned = [
+        v.strip() for v in values
+        if v.strip() and v.strip().lower() not in _DITTO_LITERALS
+    ]
+    # Require a much larger run before considering it suspicious. Real textile
+    # batches commonly produce 5-10 identical IO/Lot numbers across rows.
+    if len(cleaned) < 12 or len(set(cleaned)) != 1:
         return False
     val = cleaned[0]
-    # Don't flag dates (contain /)
-    if "/" in val:
-        return False
-    # Don't flag short values that could be legitimate codes/abbreviations
-    if len(val) <= 3:
-        return False
-    return True
+    # Real data: dates, numbers, alphanumeric codes — these are legitimate
+    # repeats. Only flag if the value looks like obvious filler.
+    val_lower = val.lower()
+    # Obvious filler patterns: all same character (aaaa, xxxx, 0000), or known junk
+    if len(set(val_lower)) == 1:
+        return True
+    if val_lower in {"n/a", "na", "none", "null", "tbd", "xxx", "test", "sample"}:
+        return True
+    # Anything else (real codes, names, numbers) — not fabricated, just repeated data
+    return False
 
 
 def detect_fabrication(headers: List[str], rows: List[List[str]]) -> bool:
@@ -272,14 +314,14 @@ def detect_fabrication(headers: List[str], rows: List[List[str]]) -> bool:
 # Auto-generated hints for known textile register column types.
 # These are used when the user hasn't provided a specific hint for a column.
 DEFAULT_COLUMN_HINTS: Dict[str, str] = {
-    "style code": "5-6 digit number (e.g. 116045, 114228, 105532)",
-    "lot no": "5-digit lot number (e.g. 24357, 22473, 24558)",
-    "lot": "5-digit lot number (e.g. 24357, 22473)",
-    "lot number": "5-digit lot number (e.g. 24357, 22473)",
-    "io no": "5-digit IO number (e.g. 84415, 84437, 83851)",
-    "io number": "5-digit IO number (e.g. 84415, 84437, 83851)",
-    "io#": "5-digit IO number (e.g. 84415, 84437)",
-    "i.o. no": "5-digit IO number (e.g. 84415, 84437)",
+    "style code": "EXACTLY 5 or 6 digits (e.g. 116045, 114228, 105532, 117939). Never 7 digits. Do not prepend the row number.",
+    "lot no": "EXACTLY 5 digits (e.g. 24357, 22473, 24558). Never 6 digits. Do not prepend the row number.",
+    "lot": "EXACTLY 5 digits (e.g. 24357, 22473). Never 6 digits.",
+    "lot number": "EXACTLY 5 digits (e.g. 24357, 22473). Never 6 digits.",
+    "io no": "EXACTLY 5 digits (e.g. 84415, 84437, 83851, 85017). Never 6 digits. Do not prepend the row number.",
+    "io number": "EXACTLY 5 digits (e.g. 84415, 84437, 83851, 85017). Never 6 digits. Do not prepend the row number.",
+    "io#": "EXACTLY 5 digits (e.g. 84415, 84437). Never 6 digits.",
+    "i.o. no": "EXACTLY 5 digits (e.g. 84415, 84437). Never 6 digits.",
     "buyer name": "company/party name (e.g. LUXMI, RVM, WSP, DM, DUNLEM, Revman, Rajluxmi, W.S.P)",
     "party name": "company/party name (e.g. DUNLEM, Revman, WSP, TLi, Mali, Moda)",
     "party": "company/party name (e.g. DUNLEM, Revman, WSP)",
@@ -395,6 +437,15 @@ async def ocr_full_page(
     headers = result.get("headers", [])
     rows = result.get("rows", [])
 
+    if not rows:
+        print(f"[ocr_engine] Attempt 1 returned 0 rows (headers={headers}). Retrying with stricter prompt...")
+        retry_result = await _retry_extraction(img_base64, expected_headers, extraction_hints)
+        if retry_result.get("rows"):
+            print(f"[ocr_engine] Retry recovered {len(retry_result['rows'])} rows.")
+            return retry_result
+        print("[ocr_engine] Retry also returned 0 rows. Model could not read this image.")
+        return result
+
     if rows and detect_fabrication(headers, rows):
         print("[ocr_engine] Attempt 1 produced fabricated data. Retrying with stricter prompt...")
         # Attempt 2: Retry with stronger anti-hallucination prompt + hints
@@ -425,6 +476,7 @@ async def _call_vision_llm(
             image_base64=img_base64,
             image_mime_type="image/jpeg",
             max_tokens=8000,
+            model=REGISTER_VISION_MODEL,
         )
         print(f"[ocr_engine] LLM response ({len(raw)} chars): {raw[:400]}")
 
@@ -467,6 +519,8 @@ async def _retry_extraction(
         "- You MUST read from the actual image. NEVER output sequential data.\n"
         "- PRESERVE all separators: / - x spaces. '2/18 ZT' stays '2/18 ZT'.\n"
         "- Empty cells = \"\". Do NOT fill blanks with neighboring values.\n"
+        "- DITTO marks ('do', '\"', '〃'): output the literal token 'do' — do NOT "
+        "resolve or blank them; a later step copies the value down.\n"
         "- Real handwritten data has irregular, unique values in each cell.\n"
         "If you cannot read the handwriting, return: {\"headers\":[], \"rows\":[], \"confidence\":0}\n"
         "Return ONLY JSON: {\"headers\":[...], \"rows\":[[...]], \"confidence\":N}"

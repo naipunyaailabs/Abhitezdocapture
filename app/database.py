@@ -12,6 +12,15 @@ class Database:
             await self.client.admin.command('ping')
             self.db = self.client[settings.DB_NAME]
             print("Successfully connected to MongoDB")
+            
+            # Initialize collections with proper indexes
+            try:
+                # Ensure sessions collection has TTL index
+                await self.db.sessions.create_index("expiresAt", expireAfterSeconds=0)
+                print("[Database] TTL index created for sessions collection")
+            except Exception as e:
+                print(f"[Database] Note on TTL index: {e}")
+                
         except Exception as e:
             print(f"CRITICAL: Failed to connect to MongoDB: {e}")
             self.db = None

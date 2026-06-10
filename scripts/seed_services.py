@@ -1,10 +1,20 @@
 import asyncio
-from motor.motor_asyncio import AsyncIOMotorClient
 import os
 from datetime import datetime
+from pathlib import Path
+
+# Load .env from the project root (parent of scripts/) so the seeder
+# uses the same MongoDB URI as the running app.
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+except ImportError:
+    pass
+
+from motor.motor_asyncio import AsyncIOMotorClient
 
 MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
-DB_NAME = "docapture"
+DB_NAME = os.getenv("DB_NAME", "docapture")
 
 services = [
     {
@@ -74,6 +84,34 @@ services = [
         "supportedFileTypes": [".pdf", ".jpg", ".jpeg", ".png", ".docx", ".txt"],
         "icon": "BrainCircuit",
         "category": "AI Power Tool",
+        "fileFieldName": "document",
+        "isActive": True
+    },
+    {
+        "id": "waste-downgrade",
+        "slug": "waste-downgrade",
+        "name": "Waste & Downgrade",
+        "description": "Extract handwritten Wastage + Downgrade register sheets",
+        "longDescription": "Upload handwritten or printed Wastage + Downgrade sheets (PDF or image). The AI extracts the page DATE plus every row across IO NO, A/B/C/D-GRADE, CHINDI, POUCHA, SELVAGE, PATTI and Total — ready for Excel export.",
+        "endpoint": "/api/waste-downgrade/extract",
+        "supportedFormats": ["excel", "json"],
+        "supportedFileTypes": [".pdf", ".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".webp"],
+        "icon": "ClipboardList",
+        "category": "Table Extraction",
+        "fileFieldName": "document",
+        "isActive": True
+    },
+    {
+        "id": "lot-history-cards",
+        "slug": "lot-history-cards",
+        "name": "Lot History Cards Extraction",
+        "description": "Extract Abhitex Lot History Card (Grey Folding) forms",
+        "longDescription": "Upload handwritten or printed Lot History Card (Grey Folding) forms (PDF or image). The AI extracts the header fields (I.O. No, Dye Lot No, Shade No, Quality M.No) plus every roll across Rope 1, Rope 2 and Rope 3 (Roll No, Total Pcs, Wt kg, Code) — ready for Excel export. Built to scale to thousands of cards.",
+        "endpoint": "/api/lot-history-cards/extract",
+        "supportedFormats": ["excel", "json"],
+        "supportedFileTypes": [".pdf", ".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".webp"],
+        "icon": "ClipboardList",
+        "category": "Table Extraction",
         "fileFieldName": "document",
         "isActive": True
     }
