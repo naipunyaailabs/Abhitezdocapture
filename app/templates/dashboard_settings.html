@@ -114,50 +114,11 @@
         </form>
     </div>
 
-    <!-- Notifications Section -->
-    <div class="settings-card">
-        <h3>🔔 Notifications</h3>
-        <p class="settings-desc">Control how you receive updates.</p>
-        <div class="toggle-row">
-            <div>
-                <strong>Email Notifications</strong>
-                <p style="color: var(--text-muted); font-size: 0.85rem;">Receive processing completion emails</p>
-            </div>
-            <label class="switch">
-                <input type="checkbox" id="notify-email" checked>
-                <span class="slider"></span>
-            </label>
-        </div>
-        <div class="toggle-row">
-            <div>
-                <strong>Newsletter</strong>
-                <p style="color: var(--text-muted); font-size: 0.85rem;">Product updates and new features</p>
-            </div>
-            <label class="switch">
-                <input type="checkbox" id="notify-newsletter" {{ 'checked' if current_user.subscribedToNewsletter }}>
-                <span class="slider"></span>
-            </label>
-        </div>
-        <div class="toggle-row" style="border-bottom: none;">
-            <div>
-                <strong>Usage Alerts</strong>
-                <p style="color: var(--text-muted); font-size: 0.85rem;">Alert when approaching document limit</p>
-            </div>
-            <label class="switch">
-                <input type="checkbox" id="notify-usage" checked>
-                <span class="slider"></span>
-            </label>
-        </div>
-    </div>
-
     <!-- Danger Zone -->
     <div class="settings-card danger">
         <h3>⚠️ Danger Zone</h3>
         <p class="settings-desc">Irreversible actions for your account.</p>
         <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-            <button class="btn-danger"
-                onclick="if(confirm('Are you sure? All your data will be permanently deleted.')) alert('Account deletion requested. Contact support.')">Delete
-                Account</button>
             <button class="btn-premium btn-outline"
                 onclick="if(confirm('This will clear all processing history.')) alert('History cleared.')">Clear
                 History</button>

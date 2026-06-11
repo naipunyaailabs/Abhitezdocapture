@@ -1,54 +1,12 @@
 from fastapi import APIRouter, Header, Depends, HTTPException, BackgroundTasks, Response
 from datetime import datetime, timedelta
-from app.models.user import UserCreate, LoginRequest, RegisterResponse, LoginResponse, VerifyEmailRequest, UserResponse, UserUpdate
+from app.models.user import LoginRequest, LoginResponse, VerifyEmailRequest, UserResponse, UserUpdate
 from app.services.auth_service import auth_service
 from app.services.email_service import email_service
-from app.services.subscription_service import subscription_service
 from app.utils.auth import get_current_user
 from typing import Optional
 
 router = APIRouter()
-
-@router.post("/register", response_model=RegisterResponse, status_code=201)
-async def register(user_create: UserCreate, background_tasks: BackgroundTasks, response: Response):
-    existing_user = await auth_service.find_user_by_email(user_create.email)
-    if existing_user:
-        raise HTTPException(status_code=409, detail="User with this email already exists")
-
-    if not user_create.agreedToTerms:
-        raise HTTPException(status_code=400, detail="You must agree to the terms and conditions")
-
-    user = await auth_service.create_user(user_create)
-    if not user:
-        raise HTTPException(status_code=500, detail="Failed to create user")
-
-    # Send verification email in background
-    background_tasks.add_task(
-        email_service.send_verification_email, 
-        user.email, 
-        user.emailVerificationToken
-    )
-    
-    # Create trial subscription
-    await subscription_service.create_trial(user.userId)
-    
-    token = await auth_service.create_session(user.userId)
-    
-    # Set cookie for server-rendered pages
-    response.set_cookie(
-        key="token", 
-        value=token, 
-        max_age=60 * 60 * 24 * 7, # 1 week
-        path="/",
-        samesite="lax",
-        httponly=False # Must be accessible by sdk.js
-    )
-    
-    return RegisterResponse(
-        token=token,
-        user=UserResponse.from_orm(user),
-        message="User registered successfully. Please check your email for verification."
-    )
 
 @router.post("/login", response_model=LoginResponse)
 async def login(login_req: LoginRequest, response: Response):

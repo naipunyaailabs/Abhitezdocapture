@@ -158,10 +158,6 @@ async def contact_submit(request: Request):
     # TODO: store inquiry in DB or send notification email
     return {"status": "ok", "message": "Inquiry received"}
 
-@app.get("/register", response_class=HTMLResponse)
-async def register_page(request: Request):
-    return templates.TemplateResponse(request, "register.html")
-
 @app.get("/verify-email-sent", response_class=HTMLResponse)
 async def verify_email_sent_page(request: Request, email: str = ""):
     return templates.TemplateResponse(request, "verify_email_sent.html", {"email": email})

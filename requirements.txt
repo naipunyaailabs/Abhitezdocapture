@@ -16,3 +16,8 @@ jinja2
 
 # For Excel Generation
 openpyxl
+
+opencv-python-headless
+
+
+opencv-python
