@@ -29,11 +29,25 @@ vision prompts. Fixed columns, no template picking, stateless.
 from __future__ import annotations
 
 import json
+import re as _re
 from typing import Any, Dict, List, Tuple
 
 from app.services.llm_service import llm_service
 from app.services.register_extractor.register_service import register_extractor_service
 from app.services.register_extractor.ocr_engine import parse_llm_json
+
+
+# Vision model for production-sheet OCR. Maverick (128-expert) is markedly more
+# accurate on handwritten digits than Scout (16-expert) — it reduces the common
+# 0/8, 2/4, 6/0, 3/8 confusions. Override via PRODUCTION_SHEETS_VISION_MODEL.
+import os as _os
+VISION_MODEL = _os.getenv(
+    "PRODUCTION_SHEETS_VISION_MODEL",
+    "meta-llama/llama-4-maverick-17b-128e-instruct",
+)
+# Number of independent extraction passes whose results are merged by majority
+# vote per cell. Digit misreads are semi-random, so voting cancels most of them.
+VOTING_PASSES = int(_os.getenv("PRODUCTION_SHEETS_VOTING_PASSES", "3"))
 
 
 # ── Reduced "green column" schema (stable — frontend + export depend on it) ──
@@ -118,25 +132,32 @@ DETECT_USER_PROMPT = (
 DATE_SYSTEM_PROMPT = (
     "You are reading a daily production register page from an Indian textile "
     "factory. At the TOP of the page there is a 'DATE :' field with a "
-    "handwritten date value.\n"
-    "Your job: Read EXACTLY what is written in the DATE field.\n\n"
-    "DATE FORMATS IN THESE REGISTERS:\n"
-    "- Indian format with slashes: 3/5/96 (day/month/year)\n"
-    "- Mixed format: 9.8/5/26 (dots and slashes)\n"
-    "- Standard format: 08/06/26, 12/05/25\n"
-    "- Other: 5 May 2026, 3 JUN 2025\n\n"
-    "RULES:\n"
-    "1. Preserve EXACTLY what is written: slashes, dots, spacing, numbers, letters\n"
-    "2. Do NOT convert formats (e.g., '3/5/96' stays '3/5/96')\n"
-    "3. If date is unclear, output your best reading\n"
-    "4. If no date visible, output empty string ''\n\n"
-    "Output JSON: {\"date\": \"<exact_date_string>\"}"
+    "handwritten date value, sometimes followed by a shift word (DAY / NIGHT).\n\n"
+    "Your ONLY job: TRANSCRIBE the date character-by-character, EXACTLY as drawn.\n\n"
+    "ABSOLUTE RULES — READ CAREFULLY:\n"
+    "1. Copy every character literally: digits, slashes '/', dots '.', dashes,\n"
+    "   and spacing. Read it left to right, one symbol at a time.\n"
+    "2. NEVER convert or interpret. Do NOT turn numbers into month names.\n"
+    "   If the page shows '06/06/026', output exactly \"06/06/026\" — NOT\n"
+    "   '6 June', NOT '6 June 2026', NOT '06/06/2026'. Keep the literal digits,\n"
+    "   even if the year looks unusual like '026' or '26'.\n"
+    "3. Do NOT 'fix' or normalize anything. Leading zeros stay. Three-digit\n"
+    "   years stay three digits. Whatever is ink on the page is the answer.\n"
+    "4. Apply the same digit care as elsewhere (0 vs 8, 6 vs 0, 2 vs 4, 3 vs 8).\n"
+    "5. If a SHIFT word (DAY or NIGHT) is written next to the date, include it\n"
+    "   in a separate field. Do not merge it into the date string.\n"
+    "6. If no date is visible, output an empty string for date.\n\n"
+    "Output JSON ONLY: {\"date\": \"<exact literal date string>\", "
+    "\"shift\": \"<DAY|NIGHT|>\"}"
 )
 
 DATE_USER_PROMPT = (
-    "This is a production register page. Read the DATE value shown at the top "
-    "next to 'DATE :'. Return EXACTLY what you read, preserving all slashes, "
-    "dots, and formatting. Output JSON: {\"date\": \"<value>\"}."
+    "Transcribe the DATE next to 'DATE :' at the top of this page EXACTLY as "
+    "written, character by character — keep all slashes/dots and the literal "
+    "digits (e.g. '06/06/026' stays '06/06/026', never '6 June'). Do NOT convert "
+    "to a month name or change the year digits. If a DAY/NIGHT shift word is "
+    "present, put it in 'shift'. Output JSON: "
+    "{\"date\": \"<literal>\", \"shift\": \"<DAY|NIGHT|>\"}."
 )
 
 
@@ -209,6 +230,25 @@ ROWS_SYSTEM_PROMPT = (
     "- A ditto mark in the cell → output \"^\" (the system resolves it).\n"
     "- A completely blank cell with NO mark at all → output \"\".\n"
     "- Do NOT confuse zero with blank, and do NOT confuse a ditto with a blank.\n\n"
+
+    "HANDWRITTEN DIGIT DISCIPLINE — THE #1 SOURCE OF ERRORS:\n"
+    "Read each digit by its actual drawn shape. Do NOT pattern-guess. These pairs\n"
+    "are the most commonly CONFUSED — look carefully and pick the one truly drawn:\n"
+    "  • 0 vs 8 : 0 is a single open loop; 8 has a pinched waist (two stacked loops).\n"
+    "  • 0 vs 6 : 6 has a tail/hook curling up into the loop; 0 is a clean oval.\n"
+    "  • 2 vs 4 : 2 has a rounded top and a flat baseline; 4 has a straight\n"
+    "             vertical stroke and an open or closed triangle, no baseline curve.\n"
+    "  • 3 vs 8 : 3 is open on the LEFT (two right-facing bumps); 8 is fully closed.\n"
+    "  • 1 vs 7 : 7 has a horizontal top bar; 1 does not.\n"
+    "  • 5 vs 6 : 5 has a flat top and open bottom curve; 6 is a closed lower loop.\n"
+    "Transcribe the digits you SEE, never what you expect a code 'should' be.\n"
+    "Read every digit of a number left-to-right; do not drop or add digits.\n\n"
+
+    "INTEGER COLUMNS — NO DECIMAL POINTS:\n"
+    "LOT NO, STYLE CODE, IO NUMBER, ShadeCode, TeamCode, and PCS are WHOLE NUMBERS.\n"
+    "They must NEVER contain a decimal point or fractional part. If you think you\n"
+    "see a dot in one of these, it is dirt/noise on the page — ignore it. ONLY the\n"
+    "KGS column may contain a decimal (e.g. 32.2). Never invent a decimal in KGS.\n\n"
 
     "COLUMN ALIGNMENT (MOST IMPORTANT):\n"
     "EVERY ROW MUST HAVE EXACTLY 7 VALUES IN THIS ORDER:\n"
@@ -309,6 +349,7 @@ async def _detect_sheet_type(img_base64: str) -> str:
             image_base64=img_base64,
             image_mime_type="image/jpeg",
             max_tokens=120,
+            model=VISION_MODEL,
         )
         result = parse_llm_json(raw)
         if isinstance(result, dict):
@@ -320,8 +361,9 @@ async def _detect_sheet_type(img_base64: str) -> str:
     return DEFAULT_SHEET_TYPE
 
 
-async def _extract_page_date(img_base64: str) -> str:
-    """Read the DATE header field from a single page image."""
+async def _extract_page_date(img_base64: str) -> Tuple[str, str]:
+    """Read the DATE (and optional shift) header field from a page image.
+    Returns (date_string, shift_string)."""
     try:
         raw = await llm_service.unified_chat_completion(
             DATE_SYSTEM_PROMPT,
@@ -329,12 +371,68 @@ async def _extract_page_date(img_base64: str) -> str:
             image_base64=img_base64,
             image_mime_type="image/jpeg",
             max_tokens=200,
+            model=VISION_MODEL,
         )
         result = parse_llm_json(raw)
-        return (result.get("date") or "").strip() if isinstance(result, dict) else ""
+        if isinstance(result, dict):
+            date_val = (result.get("date") or "").strip()
+            shift_val = (result.get("shift") or "").strip().upper()
+            if shift_val not in ("DAY", "NIGHT"):
+                shift_val = ""
+            return date_val, shift_val
+        return "", ""
     except Exception as exc:
         print(f"[ProductionSheets] DATE extract failed: {exc}")
-        return ""
+        return "", ""
+
+
+# Columns that must be whole numbers — a decimal here is an OCR/noise artifact.
+# KGS is intentionally excluded: it is the only column allowed a decimal.
+_INTEGER_COLUMNS = ("LOT NO", "STYLE CODE", "IO NUMBER", "PCS")
+
+
+def _clean_cell(col: str, val: str) -> str:
+    """Deterministic cleanup of a single extracted value.
+
+    - Trims whitespace.
+    - For integer columns, removes decimal points and any fractional part
+      ('1234.0' → '1234', '12.34' → '1234'), and strips stray non-digit noise
+      while leaving purely-alphanumeric codes intact.
+    - KGS keeps a single decimal if present.
+    """
+    v = (val or "").strip()
+    if v == "" or v == DITTO_SENTINEL:
+        return v
+
+    if col in _INTEGER_COLUMNS:
+        if _re.fullmatch(r"[\d.\s]+", v):
+            v = _re.sub(r"\s", "", v)
+            # A trailing ".0"/".00" is a spurious fractional part on an integer
+            # ('1234.0' → '1234') — drop it rather than concatenating digits.
+            v = _re.sub(r"\.0*$", "", v)
+            # Any remaining dots are stray marks between digits ('12.34' is a
+            # misread of '1234' in an integer column) — remove them.
+            return v.replace(".", "")
+        return v
+
+    if col == "KGS":
+        # Keep at most one decimal point; strip spaces. Leave non-numeric as-is.
+        if _re.fullmatch(r"[\d.\s]+", v):
+            v = _re.sub(r"\s", "", v)
+            if v.count(".") > 1:
+                first = v.find(".")
+                v = v[:first + 1] + v[first + 1:].replace(".", "")
+            return v.rstrip(".")
+        return v
+
+    return v
+
+
+def _clean_rows(rows: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    for row in rows:
+        for col in COLUMNS:
+            row[col] = _clean_cell(col, row.get(col, ""))
+    return rows
 
 
 # Identifier columns that commonly DITTO down the sheet. For these, a BLANK
@@ -409,12 +507,13 @@ def _map_rows(raw_rows: Any, page_num: int) -> List[Dict[str, str]]:
 
         mapped.append(row_dict)
 
-    # Resolve ditto marks across the surviving rows (in original order).
-    return _resolve_dittos(mapped)
+    # Resolve ditto marks across the surviving rows (in original order),
+    # then deterministically clean each cell (strip decimals from integer cols).
+    return _clean_rows(_resolve_dittos(mapped))
 
 
-async def _extract_page_rows(img_base64: str, page_num: int) -> Tuple[List[Dict[str, str]], float]:
-    """Extract the reduced 7-column rows from a single production page."""
+async def _extract_page_rows_once(img_base64: str, page_num: int):
+    """One extraction pass. Returns (rows, confidence) or (None, 0.0) on failure."""
     try:
         raw = await llm_service.unified_chat_completion(
             ROWS_SYSTEM_PROMPT,
@@ -422,21 +521,86 @@ async def _extract_page_rows(img_base64: str, page_num: int) -> Tuple[List[Dict[
             image_base64=img_base64,
             image_mime_type="image/jpeg",
             max_tokens=4000,
+            model=VISION_MODEL,
         )
         result = parse_llm_json(raw)
         if not isinstance(result, dict):
-            return [], 0.0
-
+            return None, 0.0
         mapped_rows = _map_rows(result.get("rows", []), page_num)
         confidence = float(result.get("confidence", 0.0) or 0.0)
-
-        print(f"[ProductionSheets] Page {page_num}: rows={len(mapped_rows)} conf={confidence*100:.1f}%")
         return mapped_rows, confidence
     except Exception as exc:
-        print(f"[ProductionSheets] Row extraction failed (page {page_num}): {exc}")
-        import traceback
-        traceback.print_exc()
-        return [], 0.0
+        print(f"[ProductionSheets] Row pass failed (page {page_num}): {exc}")
+        return None, 0.0
+
+
+def _vote_rows(passes: List[List[Dict[str, str]]]) -> List[Dict[str, str]]:
+    """Merge multiple extraction passes by majority vote PER CELL.
+
+    Passes can disagree on row count; we align by row index up to the modal
+    length. For each (row, column) cell we take the most common non-empty value
+    across passes. Ties fall back to the first pass's value (it is the primary).
+    This cancels most random digit misreads without ever inventing a value.
+    """
+    from collections import Counter
+    valid = [p for p in passes if p]
+    if not valid:
+        return []
+    if len(valid) == 1:
+        return valid[0]
+
+    # Use the most common row count as the canonical length; prefer the longest
+    # among the modal set so we don't silently drop rows a pass actually read.
+    length_counts = Counter(len(p) for p in valid)
+    modal_len = max(length_counts, key=lambda L: (length_counts[L], L))
+    # The reference pass is the first one whose length matches the modal length.
+    reference = next((p for p in valid if len(p) == modal_len), valid[0])
+
+    merged: List[Dict[str, str]] = []
+    for i in range(len(reference)):
+        cell_votes: Dict[str, Counter] = {col: Counter() for col in COLUMNS}
+        for p in valid:
+            if i < len(p):
+                for col in COLUMNS:
+                    v = (p[i].get(col, "") or "").strip()
+                    if v != "":
+                        cell_votes[col][v] += 1
+        row: Dict[str, str] = {}
+        for col in COLUMNS:
+            votes = cell_votes[col]
+            if not votes:
+                row[col] = ""
+                continue
+            top = votes.most_common()
+            best_count = top[0][1]
+            tied = [val for val, c in top if c == best_count]
+            if len(tied) == 1:
+                row[col] = tied[0]
+            else:
+                # Tie → trust the reference pass's value if it's among the tied.
+                ref_val = (reference[i].get(col, "") or "").strip()
+                row[col] = ref_val if ref_val in tied else tied[0]
+        merged.append(row)
+    return merged
+
+
+async def _extract_page_rows(img_base64: str, page_num: int) -> Tuple[List[Dict[str, str]], float]:
+    """Extract rows via N independent passes merged by per-cell majority vote."""
+    import asyncio
+    n = max(1, VOTING_PASSES)
+    results = await asyncio.gather(
+        *[_extract_page_rows_once(img_base64, page_num) for _ in range(n)]
+    )
+    passes = [rows for rows, _ in results if rows is not None]
+    confs = [c for rows, c in results if rows is not None and c]
+
+    merged = _vote_rows(passes)
+    # Confidence: average of passes, nudged up when passes agreed on row count.
+    confidence = (sum(confs) / len(confs)) if confs else 0.0
+
+    print(f"[ProductionSheets] Page {page_num}: passes={len(passes)}/{n} "
+          f"rows={len(merged)} conf={confidence*100:.1f}%")
+    return merged, confidence
 
 
 class ProductionSheetsService:
@@ -460,13 +624,14 @@ class ProductionSheetsService:
         image_url = page_info.get("image_url", "")
 
         sheet_type = await _detect_sheet_type(img_b64)
-        date_value = await _extract_page_date(img_b64)
+        date_value, shift_value = await _extract_page_date(img_b64)
         mapped_rows, confidence = await _extract_page_rows(img_b64, page_num)
 
         meta = sheet_meta(sheet_type)
         print(
             f"[ProductionSheets] Page {page_num} complete: type={sheet_type} "
-            f"date='{date_value}' rows={len(mapped_rows)} conf={confidence*100:.1f}%"
+            f"date='{date_value}' shift='{shift_value}' rows={len(mapped_rows)} "
+            f"conf={confidence*100:.1f}%"
         )
 
         return {
@@ -477,6 +642,7 @@ class ProductionSheetsService:
             "sheet_label": meta["label"],
             "team_header": meta["team_header"],
             "date": date_value,
+            "shift": shift_value,
             "headers": COLUMNS,
             "rows": mapped_rows,
             "confidence": confidence,
