@@ -78,4 +78,53 @@ class EmailService:
         """
         self.send_email(email, subject, html_body)
 
+    def send_invite_email(self, email: str, name: str, token: str,
+                          monthly_limit: int = None):
+        """Professional invitation email asking a newly-added client to set their
+        password and activate their account."""
+        setup_url = f"{self.frontend_url}/set-password?token={token}"
+        greeting = name.strip() if name and name.strip() else "there"
+        limit_line = ""
+        if monthly_limit:
+            limit_line = (
+                f"<tr><td style='padding:6px 0;color:#94a3b8;font-size:14px;'>"
+                f"Your account is provisioned with <strong style='color:#fbbf24;'>"
+                f"{monthly_limit} document credits per month</strong>.</td></tr>"
+            )
+        subject = "You've been invited to DoCapture AI — Activate your account"
+        html_body = f"""
+        <div style="max-width: 600px; margin: 0 auto; font-family: 'Segoe UI', Arial, sans-serif; background: #0f172a; color: #e2e8f0; padding: 40px; border-radius: 16px;">
+            <div style="text-align: center; margin-bottom: 28px;">
+                <h1 style="color: #fbbf24; font-size: 28px; margin: 0;">DoCapture<span style="color: #fff;">AI</span></h1>
+            </div>
+            <h2 style="color: #fff; font-size: 22px; margin: 0 0 16px;">Welcome aboard, {greeting}</h2>
+            <p style="color: #cbd5e1; font-size: 15px; line-height: 1.6; margin: 0 0 16px;">
+                An administrator has created a DoCapture AI account for you. To get started,
+                please activate your account by setting a secure password.
+            </p>
+            <table style="width:100%; margin: 0 0 24px;">
+                <tr><td style="padding:6px 0;color:#94a3b8;font-size:14px;">
+                    <strong style="color:#e2e8f0;">Account email:</strong> {email}</td></tr>
+                {limit_line}
+            </table>
+            <div style="text-align: center; margin: 0 0 28px;">
+                <a href="{setup_url}" style="display: inline-block; background: linear-gradient(135deg, #fbbf24, #d97706); color: #000; padding: 14px 44px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 16px;">Set Your Password</a>
+            </div>
+            <p style="color: #94a3b8; font-size: 13px; line-height: 1.6; margin: 0 0 8px;">
+                Or copy and paste this link into your browser:
+            </p>
+            <p style="color: #64748b; font-size: 12px; word-break: break-all; margin: 0 0 24px;">{setup_url}</p>
+            <p style="color: #64748b; font-size: 13px; line-height: 1.6;">
+                This activation link will expire in 48 hours for your security. If you were not
+                expecting this invitation, please disregard this email.
+            </p>
+            <hr style="border: none; border-top: 1px solid #1e293b; margin: 28px 0;">
+            <p style="color: #475569; font-size: 12px; text-align: center; margin: 0;">
+                &copy; 2026 DoCapture AI. All rights reserved.
+            </p>
+        </div>
+        """
+        self.send_email(email, subject, html_body)
+
+
 email_service = EmailService()

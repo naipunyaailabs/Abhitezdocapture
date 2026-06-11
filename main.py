@@ -166,6 +166,10 @@ async def contact_submit(request: Request):
     # TODO: store inquiry in DB or send notification email
     return {"status": "ok", "message": "Inquiry received"}
 
+@app.get("/set-password", response_class=HTMLResponse)
+async def set_password_page(request: Request, token: str = ""):
+    return templates.TemplateResponse(request, "set_password.html", {"token": token})
+
 @app.get("/verify-email-sent", response_class=HTMLResponse)
 async def verify_email_sent_page(request: Request, email: str = ""):
     return templates.TemplateResponse(request, "verify_email_sent.html", {"email": email})

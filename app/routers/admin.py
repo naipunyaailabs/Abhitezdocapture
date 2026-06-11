@@ -1,14 +1,21 @@
 """Admin API — all endpoints require an admin account (allowlist or role=admin)."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 from app.utils.auth import require_admin
 from app.models.user import UserResponse
 from app.services.admin_service import admin_service
+from app.services.email_service import email_service
 
 router = APIRouter()
+
+
+class ClientCreate(BaseModel):
+    email: EmailStr
+    name: str
+    monthlyLimit: int = 100
 
 
 class CreditsUpdate(BaseModel):
@@ -29,6 +36,29 @@ async def list_users(_: UserResponse = Depends(require_admin)):
     metrics = await admin_service.list_user_metrics()
     totals = await admin_service.get_totals(metrics)
     return {"users": metrics, "totals": totals}
+
+
+@router.post("/users", status_code=201)
+async def create_client(body: ClientCreate, background_tasks: BackgroundTasks,
+                        _: UserResponse = Depends(require_admin)):
+    if body.monthlyLimit < 0:
+        raise HTTPException(status_code=400, detail="monthlyLimit must be >= 0")
+    try:
+        result = await admin_service.create_client(
+            email=str(body.email), name=body.name, monthly_limit=body.monthlyLimit,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create client: {e}")
+
+    # Send the activation/invite email in the background.
+    background_tasks.add_task(
+        email_service.send_invite_email,
+        str(body.email), body.name, result["inviteToken"], body.monthlyLimit,
+    )
+    return {"message": "Client created. An invitation email has been sent.",
+            "userId": result["userId"]}
 
 
 @router.put("/users/{user_id}/credits")

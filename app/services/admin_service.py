@@ -10,6 +10,8 @@ For every user it combines:
 It also exposes admin setters for credits and the monthly token limit.
 """
 
+import uuid
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from app.database import get_database
@@ -117,6 +119,63 @@ class AdminService:
     async def set_token_limit(self, user_id: str, monthly_token_limit: Optional[int]) -> bool:
         await usage_service.set_month_limit(user_id, monthly_token_limit)
         return True
+
+    async def create_client(self, email: str, name: str,
+                            monthly_limit: int) -> Dict[str, Any]:
+        """Create a non-admin client account in an un-activated state and return
+        the invite token. The client has no password until they set one via the
+        emailed link. Raises ValueError if the email already exists."""
+        db = await get_database()
+        if db is None:
+            raise RuntimeError("Database unavailable")
+
+        email = email.strip()
+        existing = await db.users.find_one(
+            {"email": {"$regex": f"^{email}$", "$options": "i"}}
+        )
+        if existing:
+            raise ValueError("A user with this email already exists")
+
+        user_id = str(uuid.uuid4())
+        invite_token = str(uuid.uuid4())
+        invite_expiry = datetime.now() + timedelta(hours=48)
+        now = datetime.now()
+
+        user_doc = {
+            "name": (name or email.split("@")[0]).strip(),
+            "email": email,
+            "userId": user_id,
+            "role": "user",            # never admin
+            "password": "",            # set later via invite link
+            "emailVerified": False,    # activated when password is set
+            "passwordResetToken": invite_token,
+            "passwordResetTokenExpiry": invite_expiry,
+            "createdAt": now,
+            "agreedToTermsAt": now,
+            "preferences": {},
+            "subscribedToNewsletter": False,
+        }
+        await db.users.insert_one(user_doc)
+
+        # Monthly document credits subscription. Period runs for the current
+        # calendar month; can_process rolls it over on the 1st.
+        period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        sub = {
+            "userId": user_id,
+            "planId": "managed",
+            "planName": "Managed",
+            "documentsLimit": int(monthly_limit),
+            "documentsUsed": 0,
+            "status": "active",
+            "currentPeriodStart": period_start,
+            "currentPeriodEnd": None,  # calendar-month based, recomputed on use
+            "createdAt": now,
+            "updatedAt": now,
+        }
+        await db.subscriptions.insert_one(sub)
+
+        return {"userId": user_id, "inviteToken": invite_token,
+                "inviteExpiry": invite_expiry}
 
     async def set_role(self, user_id: str, role: str) -> bool:
         db = await get_database()

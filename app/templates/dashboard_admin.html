@@ -29,6 +29,34 @@
         automatically on the 1st of each month. Only admin accounts can view this page.
     </p>
 
+    <!-- Add Client -->
+    <div class="add-client-card">
+        <h3>➕ Add Client</h3>
+        <p class="add-client-desc">Create a client account. They'll receive an email to set
+            their own password before they can sign in. Clients have normal access only.</p>
+        <div id="ac-error" class="auth-error" style="display:none;"></div>
+        <div id="ac-success" class="auth-success" style="display:none;"></div>
+        <form id="add-client-form" onsubmit="addClient(event)">
+            <div class="ac-row">
+                <div class="ac-field">
+                    <label>Username *</label>
+                    <input type="text" id="ac-name" placeholder="Client name" required>
+                </div>
+                <div class="ac-field">
+                    <label>Email *</label>
+                    <input type="email" id="ac-email" placeholder="client@company.com" required>
+                </div>
+                <div class="ac-field ac-narrow">
+                    <label>Documents / month *</label>
+                    <input type="number" id="ac-limit" min="0" value="100" required>
+                </div>
+                <div class="ac-field ac-btn">
+                    <button type="submit" id="ac-submit" class="btn-premium btn-primary">Send Invite</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
     <div class="activity-table">
         <table>
             <thead>
@@ -92,6 +120,42 @@
         return { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
     }
 
+    async function addClient(event) {
+        event.preventDefault();
+        const err = document.getElementById('ac-error');
+        const ok = document.getElementById('ac-success');
+        const btn = document.getElementById('ac-submit');
+        err.style.display = 'none'; ok.style.display = 'none';
+
+        const name = document.getElementById('ac-name').value.trim();
+        const email = document.getElementById('ac-email').value.trim();
+        const limit = parseInt(document.getElementById('ac-limit').value, 10);
+
+        btn.textContent = 'Sending…'; btn.disabled = true;
+        try {
+            const res = await fetch('/admin/users', {
+                method: 'POST', headers: authHeaders(),
+                body: JSON.stringify({ name, email, monthlyLimit: isNaN(limit) ? 0 : limit })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                ok.textContent = data.message || 'Client created and invite sent.';
+                ok.style.display = 'block';
+                document.getElementById('add-client-form').reset();
+                document.getElementById('ac-limit').value = 100;
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                err.textContent = data.detail || 'Failed to create client.';
+                err.style.display = 'block';
+            }
+        } catch (e) {
+            err.textContent = 'Network error. Please try again.';
+            err.style.display = 'block';
+        } finally {
+            btn.textContent = 'Send Invite'; btn.disabled = false;
+        }
+    }
+
     async function saveRow(userId) {
         const used = parseInt(document.getElementById(`used-${userId}`).value, 10);
         const limit = parseInt(document.getElementById(`limit-${userId}`).value, 10);
@@ -146,6 +210,29 @@
     .sum-value { font-size: 1.8rem; font-weight: 800; color: var(--text-main); }
     .sum-label { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem; }
     .admin-note { color: var(--text-muted); font-size: 0.85rem; margin: 0 0 1.25rem; }
+
+    .add-client-card {
+        background: var(--bg-card);
+        border: 1px solid var(--glass-border);
+        border-radius: 16px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    .add-client-card h3 { font-size: 1.1rem; font-weight: 700; color: var(--text-main); margin: 0 0 0.35rem; }
+    .add-client-desc { color: var(--text-muted); font-size: 0.85rem; margin: 0 0 1rem; }
+    .ac-row { display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; }
+    .ac-field { flex: 1; min-width: 160px; }
+    .ac-field.ac-narrow { flex: 0 0 150px; min-width: 150px; }
+    .ac-field.ac-btn { flex: 0 0 auto; }
+    .ac-field label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.4rem; color: var(--text-main); }
+    .ac-field input {
+        width: 100%; padding: 0.65rem 0.85rem;
+        background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border);
+        border-radius: 8px; color: var(--text-main); font-size: 0.9rem;
+    }
+    .ac-field input:focus { outline: none; border-color: var(--primary); }
+    .auth-error { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #ef4444; padding: 0.6rem 0.9rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 0.75rem; }
+    .auth-success { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3); color: #22c55e; padding: 0.6rem 0.9rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 0.75rem; }
 
     .u-name { font-weight: 600; color: var(--text-main); }
     .u-email { font-size: 0.78rem; color: var(--text-muted); }

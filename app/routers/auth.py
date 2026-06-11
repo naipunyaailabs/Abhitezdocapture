@@ -4,6 +4,7 @@ from app.models.user import LoginRequest, LoginResponse, VerifyEmailRequest, Use
 from app.services.auth_service import auth_service
 from app.services.email_service import email_service
 from app.utils.auth import get_current_user
+from app.database import get_database
 from typing import Optional
 
 router = APIRouter()
@@ -106,6 +107,40 @@ async def update_profile(updates: dict, current_user: UserResponse = Depends(get
     if not updated_user:
         raise HTTPException(status_code=500, detail="Failed to update profile")
     return UserResponse.from_orm(updated_user)
+
+@router.post("/set-password")
+async def set_password(data: dict):
+    """Activate an invited client account: validate the invite/reset token and
+    set the chosen password. No auth required — the token is the credential."""
+    token = data.get("token")
+    new_pw = data.get("newPassword")
+    if not token or not new_pw:
+        raise HTTPException(status_code=400, detail="Token and new password are required")
+    if len(new_pw) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    db = await get_database()
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database unavailable")
+
+    user_doc = await db.users.find_one({
+        "passwordResetToken": token,
+        "passwordResetTokenExpiry": {"$gt": datetime.now()},
+    })
+    if not user_doc:
+        raise HTTPException(status_code=400, detail="Invalid or expired activation link")
+
+    await db.users.update_one(
+        {"_id": user_doc["_id"]},
+        {"$set": {
+            "password": auth_service.hash_password(new_pw),
+            "emailVerified": True,
+            "passwordResetToken": None,
+            "passwordResetTokenExpiry": None,
+        }},
+    )
+    return {"message": "Password set successfully. You can now sign in."}
+
 
 @router.post("/change-password")
 async def change_password(data: dict, current_user: UserResponse = Depends(get_current_user)):
