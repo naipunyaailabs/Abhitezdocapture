@@ -54,6 +54,13 @@ class SubscriptionService:
         return sub
 
     async def can_process(self, user_id: str) -> Tuple[bool, Optional[dict], str]:
+        # Reject blocked accounts even if they hold a valid session.
+        db = await get_database()
+        if db is not None:
+            u = await db.users.find_one({"userId": user_id}, {"status": 1})
+            if u and u.get("status") == "blocked":
+                return False, None, "Account suspended"
+
         sub = await self.get_user_subscription(user_id)
         if not sub:
             return False, None, "No active subscription"

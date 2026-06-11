@@ -32,6 +32,7 @@ class UserUpdate(BaseModel):
 class UserInDB(UserBase):
     userId: str
     role: str = "user"
+    status: str = "active"  # "active" | "blocked"
     password: str # Hashed
     emailVerified: bool = False
     emailVerificationToken: Optional[str] = None
@@ -46,6 +47,7 @@ class UserInDB(UserBase):
 class UserResponse(UserBase):
     userId: str
     role: str
+    status: str = "active"
     emailVerified: bool
     createdAt: datetime
     lastLoginAt: Optional[datetime]

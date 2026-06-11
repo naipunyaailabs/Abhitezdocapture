@@ -72,7 +72,9 @@ class AdminService:
                 "name": u.get("name"),
                 "email": u.get("email"),
                 "role": u.get("role", "user"),
+                "status": u.get("status", "active"),
                 "emailVerified": bool(u.get("emailVerified")),
+                "activated": bool(u.get("password")),
                 "lastLoginAt": u.get("lastLoginAt"),
                 "createdAt": u.get("createdAt"),
                 # credits
@@ -146,6 +148,7 @@ class AdminService:
             "email": email,
             "userId": user_id,
             "role": "user",            # never admin
+            "status": "active",
             "password": "",            # set later via invite link
             "emailVerified": False,    # activated when password is set
             "passwordResetToken": invite_token,
@@ -183,6 +186,104 @@ class AdminService:
             return False
         res = await db.users.update_one({"userId": user_id}, {"$set": {"role": role}})
         return res.matched_count > 0
+
+    # ── User management ────────────────────────────────────────────────────
+
+    async def _get_user(self, user_id: str) -> Optional[dict]:
+        db = await get_database()
+        if db is None:
+            return None
+        return await db.users.find_one({"userId": user_id})
+
+    async def delete_user(self, user_id: str) -> bool:
+        """Delete a non-admin user and their associated data."""
+        db = await get_database()
+        if db is None:
+            return False
+        user = await db.users.find_one({"userId": user_id})
+        if not user:
+            return False
+        if user.get("role") == "admin":
+            raise ValueError("Admin accounts cannot be deleted")
+        await db.users.delete_one({"userId": user_id})
+        await db.subscriptions.delete_many({"userId": user_id})
+        await db.usage_limits.delete_many({"userId": user_id})
+        await db.sessions.delete_many({"userId": user_id})
+        return True
+
+    async def set_status(self, user_id: str, status: str) -> bool:
+        """Block or unblock a user. Admins cannot be blocked."""
+        if status not in ("active", "blocked"):
+            raise ValueError("status must be 'active' or 'blocked'")
+        db = await get_database()
+        if db is None:
+            return False
+        user = await db.users.find_one({"userId": user_id})
+        if not user:
+            return False
+        if user.get("role") == "admin" and status == "blocked":
+            raise ValueError("Admin accounts cannot be blocked")
+        await db.users.update_one({"userId": user_id}, {"$set": {"status": status}})
+        if status == "blocked":
+            # Kill active sessions so the block takes effect immediately.
+            await db.sessions.delete_many({"userId": user_id})
+        return True
+
+    async def update_profile(self, user_id: str, name: Optional[str] = None,
+                             email: Optional[str] = None) -> bool:
+        db = await get_database()
+        if db is None:
+            return False
+        updates = {}
+        if name is not None and name.strip():
+            updates["name"] = name.strip()
+        if email is not None and email.strip():
+            email = email.strip()
+            clash = await db.users.find_one({
+                "email": {"$regex": f"^{email}$", "$options": "i"},
+                "userId": {"$ne": user_id},
+            })
+            if clash:
+                raise ValueError("Another user already uses this email")
+            updates["email"] = email
+        if not updates:
+            return False
+        res = await db.users.update_one({"userId": user_id}, {"$set": updates})
+        return res.matched_count > 0
+
+    async def add_credits(self, user_id: str, amount: int) -> bool:
+        """Top up a user's monthly document limit by `amount` (can be negative)."""
+        db = await get_database()
+        if db is None:
+            return False
+        res = await db.subscriptions.update_one(
+            {"userId": user_id}, {"$inc": {"documentsLimit": int(amount)}}
+        )
+        return res.matched_count > 0
+
+    async def regenerate_invite(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Issue a fresh invite/set-password token for a user. Returns the token
+        and the user's email/name for sending, or None if not found."""
+        db = await get_database()
+        if db is None:
+            return None
+        user = await db.users.find_one({"userId": user_id})
+        if not user:
+            return None
+        token = str(uuid.uuid4())
+        expiry = datetime.now() + timedelta(hours=48)
+        await db.users.update_one(
+            {"userId": user_id},
+            {"$set": {"passwordResetToken": token,
+                      "passwordResetTokenExpiry": expiry}},
+        )
+        sub = await db.subscriptions.find_one({"userId": user_id})
+        return {
+            "token": token,
+            "email": user.get("email"),
+            "name": user.get("name"),
+            "monthlyLimit": _to_int((sub or {}).get("documentsLimit")),
+        }
 
 
 admin_service = AdminService()

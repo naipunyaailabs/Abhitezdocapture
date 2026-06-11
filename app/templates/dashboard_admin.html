@@ -62,30 +62,44 @@
             <thead>
                 <tr>
                     <th>User</th>
-                    <th>Role</th>
+                    <th>Role / Status</th>
                     <th>Credits (used / limit)</th>
                     <th>Files</th>
                     <th>Services</th>
                     <th>Tokens (this month)</th>
                     <th>Monthly Token Cap</th>
-                    <th></th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for u in user_metrics %}
-                <tr data-userid="{{ u.userId }}">
+                <tr data-userid="{{ u.userId }}" data-role="{{ u.role }}" data-status="{{ u.status }}"
+                    data-name="{{ u.name|e }}" data-email="{{ u.email|e }}"
+                    class="{{ 'row-blocked' if u.status == 'blocked' else '' }}">
                     <td>
-                        <div class="u-name">{{ u.name or '—' }}</div>
-                        <div class="u-email">{{ u.email }}</div>
+                        <div class="u-name view-mode">{{ u.name or '—' }}</div>
+                        <div class="u-email view-mode">{{ u.email }}</div>
+                        <input class="mini-input full edit-mode" type="text" value="{{ u.name|e }}"
+                            id="name-{{ u.userId }}" placeholder="Name" style="display:none;">
+                        <input class="mini-input full edit-mode" type="email" value="{{ u.email|e }}"
+                            id="email-{{ u.userId }}" placeholder="Email" style="display:none; margin-top:4px;">
                     </td>
                     <td>
                         <span class="role-pill {{ 'admin' if u.role == 'admin' else 'user' }}">{{ u.role }}</span>
+                        {% if u.status == 'blocked' %}
+                        <span class="status-pill-blocked">blocked</span>
+                        {% elif not u.activated %}
+                        <span class="status-pill-pending">pending</span>
+                        {% endif %}
                     </td>
                     <td>
-                        <input class="mini-input" type="number" min="0" value="{{ u.documentsUsed }}"
-                            id="used-{{ u.userId }}" title="Documents used"> /
-                        <input class="mini-input" type="number" min="0" value="{{ u.documentsLimit }}"
-                            id="limit-{{ u.userId }}" title="Documents limit">
+                        <span class="view-mode">{{ u.documentsUsed }} / {{ u.documentsLimit }}</span>
+                        <span class="edit-mode" style="display:none;">
+                            <input class="mini-input" type="number" min="0" value="{{ u.documentsUsed }}"
+                                id="used-{{ u.userId }}" title="Documents used"> /
+                            <input class="mini-input" type="number" min="0" value="{{ u.documentsLimit }}"
+                                id="limit-{{ u.userId }}" title="Documents limit">
+                        </span>
                     </td>
                     <td>{{ u.filesExtracted }}</td>
                     <td title="{% for name, c in u.services.items() %}{{ name }}: {{ c }}&#10;{% endfor %}">
@@ -96,13 +110,34 @@
                         <span class="u-email">({{ u.callsThisMonth }} calls)</span>
                     </td>
                     <td>
-                        <input class="mini-input wide" type="number" min="0"
-                            placeholder="∞ unlimited"
+                        <span class="view-mode">{{ u.monthlyTokenLimit if u.monthlyTokenLimit is not none else '∞' }}</span>
+                        <input class="mini-input wide edit-mode" type="number" min="0"
+                            placeholder="∞ unlimited" style="display:none;"
                             value="{{ u.monthlyTokenLimit if u.monthlyTokenLimit is not none else '' }}"
                             id="tlimit-{{ u.userId }}" title="Blank = unlimited">
                     </td>
-                    <td>
-                        <button class="btn-save-row" onclick="saveRow('{{ u.userId }}')">Save</button>
+                    <td class="actions-cell">
+                        <!-- View-mode actions -->
+                        <div class="view-mode action-btns">
+                            <button class="act edit" title="Edit credits & profile" onclick="enterEdit('{{ u.userId }}')">✏️ Edit</button>
+                            <button class="act credit" title="Add document credits" onclick="addCredits('{{ u.userId }}', '{{ u.name|e }}')">＋ Credits</button>
+                            {% if u.role != 'admin' %}
+                                {% if u.status == 'blocked' %}
+                                <button class="act unblock" onclick="setStatus('{{ u.userId }}','active','{{ u.name|e }}')">✓ Unblock</button>
+                                {% else %}
+                                <button class="act block" onclick="setStatus('{{ u.userId }}','blocked','{{ u.name|e }}')">⏸ Block</button>
+                                {% endif %}
+                                {% if not u.activated %}
+                                <button class="act resend" onclick="resendInvite('{{ u.userId }}','{{ u.name|e }}')">✉️ Resend</button>
+                                {% endif %}
+                                <button class="act delete" onclick="deleteUser('{{ u.userId }}','{{ u.name|e }}')">🗑 Delete</button>
+                            {% endif %}
+                        </div>
+                        <!-- Edit-mode actions -->
+                        <div class="edit-mode action-btns" style="display:none;">
+                            <button class="act confirm" onclick="confirmEdit('{{ u.userId }}','{{ u.name|e }}')">✓ Confirm</button>
+                            <button class="act cancel" onclick="cancelEdit('{{ u.userId }}')">✕ Cancel</button>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
@@ -156,41 +191,111 @@
         }
     }
 
-    async function saveRow(userId) {
+    function row(userId) { return document.querySelector(`tr[data-userid="${userId}"]`); }
+    function toggleMode(userId, editing) {
+        const tr = row(userId);
+        tr.querySelectorAll('.view-mode').forEach(el => el.style.display = editing ? 'none' : '');
+        tr.querySelectorAll('.edit-mode').forEach(el => el.style.display = editing ? '' : 'none');
+    }
+
+    function enterEdit(userId) { toggleMode(userId, true); }
+
+    function cancelEdit(userId) {
+        // Reset fields from the row's data-* originals, then exit edit mode.
+        const tr = row(userId);
+        const nameI = document.getElementById(`name-${userId}`);
+        const emailI = document.getElementById(`email-${userId}`);
+        if (nameI) nameI.value = tr.dataset.name;
+        if (emailI) emailI.value = tr.dataset.email;
+        toggleMode(userId, false);
+    }
+
+    async function confirmEdit(userId, name) {
         const used = parseInt(document.getElementById(`used-${userId}`).value, 10);
         const limit = parseInt(document.getElementById(`limit-${userId}`).value, 10);
         const tlimitRaw = document.getElementById(`tlimit-${userId}`).value.trim();
         const tlimit = tlimitRaw === '' ? null : parseInt(tlimitRaw, 10);
+        const newName = document.getElementById(`name-${userId}`).value.trim();
+        const newEmail = document.getElementById(`email-${userId}`).value.trim();
 
-        const btn = document.querySelector(`tr[data-userid="${userId}"] .btn-save-row`);
-        const original = btn.textContent;
-        btn.textContent = 'Saving…'; btn.disabled = true;
+        if (!confirm(`Apply these changes to ${name}?`)) return;
 
         try {
-            const r1 = await fetch(`/admin/users/${userId}/credits`, {
-                method: 'PUT', headers: authHeaders(),
-                body: JSON.stringify({
-                    documentsUsed: isNaN(used) ? null : used,
-                    documentsLimit: isNaN(limit) ? null : limit
+            const calls = [
+                fetch(`/admin/users/${userId}/credits`, {
+                    method: 'PUT', headers: authHeaders(),
+                    body: JSON.stringify({
+                        documentsUsed: isNaN(used) ? null : used,
+                        documentsLimit: isNaN(limit) ? null : limit
+                    })
+                }),
+                fetch(`/admin/users/${userId}/token-limit`, {
+                    method: 'PUT', headers: authHeaders(),
+                    body: JSON.stringify({ monthlyTokenLimit: tlimit })
+                }),
+                fetch(`/admin/users/${userId}/profile`, {
+                    method: 'PUT', headers: authHeaders(),
+                    body: JSON.stringify({ name: newName, email: newEmail })
                 })
-            });
-            const r2 = await fetch(`/admin/users/${userId}/token-limit`, {
-                method: 'PUT', headers: authHeaders(),
-                body: JSON.stringify({ monthlyTokenLimit: tlimit })
-            });
-            if (r1.ok && r2.ok) {
-                btn.textContent = '✓ Saved';
-            } else {
-                const e = await (r1.ok ? r2 : r1).json().catch(() => ({}));
-                btn.textContent = 'Error';
+            ];
+            const results = await Promise.all(calls);
+            const failed = results.find(r => !r.ok);
+            if (failed) {
+                const e = await failed.json().catch(() => ({}));
                 alert('Save failed: ' + (e.detail || 'unknown error'));
+                return;
             }
+            location.reload();
         } catch (e) {
-            btn.textContent = 'Error';
             alert('Network error while saving.');
-        } finally {
-            setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1800);
         }
+    }
+
+    async function addCredits(userId, name) {
+        const raw = prompt(`How many document credits to ADD to ${name}'s monthly limit?`, '50');
+        if (raw === null) return;
+        const amount = parseInt(raw, 10);
+        if (isNaN(amount) || amount === 0) { alert('Enter a non-zero number.'); return; }
+        if (!confirm(`Add ${amount} document credits to ${name}?`)) return;
+        const res = await fetch(`/admin/users/${userId}/add-credits`, {
+            method: 'POST', headers: authHeaders(),
+            body: JSON.stringify({ amount })
+        });
+        const data = await res.json();
+        if (res.ok) { location.reload(); }
+        else alert('Failed: ' + (data.detail || 'unknown error'));
+    }
+
+    async function setStatus(userId, status, name) {
+        const verb = status === 'blocked' ? 'block' : 'unblock';
+        if (!confirm(`Are you sure you want to ${verb} ${name}?`)) return;
+        const res = await fetch(`/admin/users/${userId}/status`, {
+            method: 'PUT', headers: authHeaders(),
+            body: JSON.stringify({ status })
+        });
+        const data = await res.json();
+        if (res.ok) { location.reload(); }
+        else alert('Failed: ' + (data.detail || 'unknown error'));
+    }
+
+    async function resendInvite(userId, name) {
+        if (!confirm(`Re-send the activation email to ${name}?`)) return;
+        const res = await fetch(`/admin/users/${userId}/resend-invite`, {
+            method: 'POST', headers: authHeaders()
+        });
+        const data = await res.json();
+        alert(res.ok ? (data.message || 'Invite re-sent') : ('Failed: ' + (data.detail || 'error')));
+    }
+
+    async function deleteUser(userId, name) {
+        if (!confirm(`Permanently DELETE ${name}? This removes their account and data and cannot be undone.`)) return;
+        if (!confirm(`Final confirmation — delete ${name}?`)) return;
+        const res = await fetch(`/admin/users/${userId}`, {
+            method: 'DELETE', headers: authHeaders()
+        });
+        const data = await res.json();
+        if (res.ok) { location.reload(); }
+        else alert('Failed: ' + (data.detail || 'unknown error'));
     }
 </script>
 
@@ -249,14 +354,29 @@
         border-radius: 6px; color: var(--text-main); font-size: 0.85rem;
     }
     .mini-input.wide { width: 110px; }
+    .mini-input.full { width: 100%; }
     .svc-hint { color: var(--text-muted); cursor: help; font-size: 0.8rem; }
 
-    .btn-save-row {
-        background: var(--primary); color: #000; border: none;
-        padding: 0.4rem 0.9rem; border-radius: 6px; font-weight: 600;
-        font-size: 0.8rem; cursor: pointer;
+    .status-pill-blocked { display:inline-block; margin-left:6px; padding:0.15rem 0.5rem;
+        border-radius:10px; font-size:0.68rem; font-weight:700; text-transform:uppercase;
+        background: rgba(239,68,68,0.15); color:#ef4444; }
+    .status-pill-pending { display:inline-block; margin-left:6px; padding:0.15rem 0.5rem;
+        border-radius:10px; font-size:0.68rem; font-weight:700; text-transform:uppercase;
+        background: rgba(148,163,184,0.15); color:#94a3b8; }
+    tr.row-blocked { opacity: 0.6; }
+
+    .actions-cell { white-space: nowrap; }
+    .action-btns { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+    .act {
+        border: 1px solid var(--glass-border); background: rgba(255,255,255,0.04);
+        color: var(--text-main); padding: 0.32rem 0.6rem; border-radius: 6px;
+        font-size: 0.74rem; font-weight: 600; cursor: pointer; transition: all .15s;
     }
-    .btn-save-row:disabled { opacity: 0.6; cursor: default; }
+    .act:hover { background: rgba(255,255,255,0.1); }
+    .act.confirm { background: var(--primary); color: #000; border-color: var(--primary); }
+    .act.credit { color: #22c55e; border-color: rgba(34,197,94,0.4); }
+    .act.block, .act.delete { color: #ef4444; border-color: rgba(239,68,68,0.4); }
+    .act.unblock { color: #22c55e; border-color: rgba(34,197,94,0.4); }
 
     @media (max-width: 1100px) {
         .admin-summary { grid-template-columns: repeat(2, 1fr); }

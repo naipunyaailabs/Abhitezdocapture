@@ -23,6 +23,9 @@ async def login(login_req: LoginRequest, response: Response):
     if not user.emailVerified:
         raise HTTPException(status_code=403, detail="Please verify your email address before logging in")
 
+    if getattr(user, "status", "active") == "blocked":
+        raise HTTPException(status_code=403, detail="Your account has been suspended. Please contact your administrator.")
+
     # Update last login
     await auth_service.update_user(user.userId, {"lastLoginAt": datetime.now()})
 
