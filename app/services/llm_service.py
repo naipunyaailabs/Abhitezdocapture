@@ -22,18 +22,62 @@ class LLMService:
         image_mime_type: str = "image/jpeg",
         max_tokens: int = 4096,
         model: str = None,
+        usage_user_id: str = None,
+        usage_service_id: str = None,
     ) -> str:
+        """Run a chat completion.
+
+        If usage_user_id is provided, token usage for this call is recorded to
+        the usage ledger (attributed to usage_service_id). This is the single
+        chokepoint every extraction service flows through, so token accounting
+        only needs to live here.
+        """
         client_type = settings.AI_CLIENT
         print(f"[unified_chat_completion] Using {client_type} client, max_tokens={max_tokens}, model={model or 'default'}")
 
+        # Fall back to the per-request usage context if the caller didn't pass
+        # an explicit user id. This lets every existing call site record usage
+        # without modification — routers set the context once per request.
+        if usage_user_id is None:
+            try:
+                from app.services.usage_service import get_usage_context
+                ctx_user, ctx_service = get_usage_context()
+                usage_user_id = ctx_user
+                if usage_service_id is None:
+                    usage_service_id = ctx_service
+            except Exception:
+                pass
+
         try:
             if client_type == "ollama":
-                return await self.ollama_chat_completion(system, user, image_base64, image_mime_type, max_tokens)
+                content = await self.ollama_chat_completion(system, user, image_base64, image_mime_type, max_tokens)
+                # Ollama does not report token usage; record nothing.
+                return content
             else:
-                return await self.groq_chat_completion(system, user, image_base64, image_mime_type, max_tokens, model=model)
+                content, usage = await self.groq_chat_completion_with_usage(
+                    system, user, image_base64, image_mime_type, max_tokens, model=model,
+                )
+                if usage_user_id and usage:
+                    await self._record_usage(usage_user_id, usage_service_id, usage, model)
+                return content
         except Exception as e:
             print(f"[unified_chat_completion] Error with {client_type} client: {e}")
             raise Exception(f"Failed to process chat request with {client_type} client: {str(e)}")
+
+    async def _record_usage(self, user_id, service_id, usage, model):
+        """Best-effort: never let usage logging break an extraction."""
+        try:
+            from app.services.usage_service import usage_service
+            await usage_service.record(
+                user_id=user_id,
+                service_id=service_id,
+                prompt_tokens=usage.get("prompt_tokens", 0),
+                completion_tokens=usage.get("completion_tokens", 0),
+                total_tokens=usage.get("total_tokens", 0),
+                model=model,
+            )
+        except Exception as e:
+            print(f"[llm_service] usage record skipped: {e}")
 
     async def unified_chat_completion_with_logprobs(
         self,
@@ -74,6 +118,47 @@ class LLMService:
             model=model, want_logprobs=False,
         )
         return content
+
+    async def groq_chat_completion_with_usage(
+        self,
+        system: str,
+        user: str,
+        image_base64: str = None,
+        image_mime_type: str = "image/jpeg",
+        max_tokens: int = 4096,
+        model: str = None,
+    ):
+        """Return (content, usage_dict). usage_dict has prompt/completion/total
+        tokens from the Groq response, or {} if unavailable."""
+        if not model:
+            model = "meta-llama/llama-4-scout-17b-16e-instruct" if image_base64 else "llama-3.3-70b-versatile"
+
+        messages = [{"role": "system", "content": system}]
+        if image_base64:
+            messages.append({
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": user},
+                    {"type": "image_url", "image_url": {"url": f"data:{image_mime_type};base64,{image_base64}"}},
+                ],
+            })
+        else:
+            messages.append({"role": "user", "content": user})
+
+        completion = await self.groq_client.chat.completions.create(
+            model=model, messages=messages, temperature=0.1,
+            max_tokens=max_tokens, top_p=1.0, stream=False, stop=None,
+        )
+        content = completion.choices[0].message.content
+        usage = {}
+        u = getattr(completion, "usage", None)
+        if u is not None:
+            usage = {
+                "prompt_tokens": getattr(u, "prompt_tokens", 0) or 0,
+                "completion_tokens": getattr(u, "completion_tokens", 0) or 0,
+                "total_tokens": getattr(u, "total_tokens", 0) or 0,
+            }
+        return content, usage
 
     async def groq_chat_completion_with_logprobs(
         self,

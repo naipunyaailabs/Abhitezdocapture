@@ -15,6 +15,8 @@ print("[DEBUG] Step 1: Routers import start")
 try:
     print("[DEBUG] 1a: auth")
     from app.routers import auth
+    print("[DEBUG] 1a2: admin")
+    from app.routers import admin
     print("[DEBUG] 1b: rfp")
     from app.routers import rfp
     print("[DEBUG] 1c: extract")
@@ -75,6 +77,11 @@ async def lifespan(app: FastAPI):
     print("[DEBUG] lifespan: Connecting to database...")
     await db.connect_to_database()
     print("[DEBUG] lifespan: Connected to database.")
+    # Ensure admin accounts exist with correct role/password
+    try:
+        await auth_service.ensure_admin_accounts()
+    except Exception as e:
+        print(f"[DEBUG] lifespan: ensure_admin_accounts failed: {e}")
     yield
     # Shutdown
     await db.close_database_connection()
@@ -98,6 +105,7 @@ app.add_middleware(
 
 # Routes
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(admin.router, prefix="/admin", tags=["admin"])
 app.include_router(rfp.router, prefix="/rfp", tags=["rfp"])
 app.include_router(extract.router, prefix="/extract", tags=["extract"])
 app.include_router(history.router, prefix="/history", tags=["history"])
@@ -219,9 +227,12 @@ async def get_dashboard_context(request: Request, active_page: str):
     if sub and "_id" in sub:
         del sub["_id"]
 
+    current_user = UserResponse.model_validate(user) if hasattr(UserResponse, 'model_validate') else UserResponse.from_orm(user)
+    from app.utils.auth import user_is_admin
     return {
         "request": request,
-        "current_user": UserResponse.model_validate(user) if hasattr(UserResponse, 'model_validate') else UserResponse.from_orm(user),
+        "current_user": current_user,
+        "is_admin": user_is_admin(current_user),
         "subscription": sub or {"planId": "trial", "planName": "Free Trial", "documentsUsed": 0, "documentsLimit": 5, "status": "active"},
         "active_page": active_page,
         "api_key": settings.API_KEY
@@ -316,6 +327,22 @@ async def dashboard_settings_page(request: Request):
     if not ctx:
         return RedirectResponse("/?login=true", status_code=302)
     return templates.TemplateResponse(request, "dashboard_settings.html", ctx)
+
+
+@app.get("/dashboard/admin", response_class=HTMLResponse)
+async def dashboard_admin_page(request: Request):
+    ctx = await get_dashboard_context(request, "admin")
+    if not ctx:
+        return RedirectResponse("/?login=true", status_code=302)
+    # Strictly admin-only: non-admins are bounced back to the dashboard.
+    if not ctx.get("is_admin"):
+        return RedirectResponse("/dashboard", status_code=302)
+
+    from app.services.admin_service import admin_service
+    metrics = await admin_service.list_user_metrics()
+    totals = await admin_service.get_totals(metrics)
+    ctx.update({"user_metrics": metrics, "admin_totals": totals})
+    return templates.TemplateResponse(request, "dashboard_admin.html", ctx)
 
 
 if __name__ == "__main__":

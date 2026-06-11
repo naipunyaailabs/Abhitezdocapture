@@ -1,0 +1,178 @@
+{% extends "dashboard_base.html" %}
+
+{% block page_title %}Admin Access{% endblock %}
+
+{% block dashboard_content %}
+<div class="admin-wrap">
+    <!-- Summary cards -->
+    <div class="admin-summary">
+        <div class="sum-card">
+            <div class="sum-value">{{ admin_totals.totalUsers }}</div>
+            <div class="sum-label">Users</div>
+        </div>
+        <div class="sum-card">
+            <div class="sum-value">{{ admin_totals.totalFiles }}</div>
+            <div class="sum-label">Files Extracted</div>
+        </div>
+        <div class="sum-card">
+            <div class="sum-value">{{ '{:,}'.format(admin_totals.totalTokens) }}</div>
+            <div class="sum-label">Tokens ({{ admin_totals.period }})</div>
+        </div>
+        <div class="sum-card">
+            <div class="sum-value">{{ admin_totals.totalCredits }}</div>
+            <div class="sum-label">Credits Used</div>
+        </div>
+    </div>
+
+    <p class="admin-note">
+        Monitoring for <strong>{{ admin_totals.period }}</strong>. Token counts reset
+        automatically on the 1st of each month. Only admin accounts can view this page.
+    </p>
+
+    <div class="activity-table">
+        <table>
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Role</th>
+                    <th>Credits (used / limit)</th>
+                    <th>Files</th>
+                    <th>Services</th>
+                    <th>Tokens (this month)</th>
+                    <th>Monthly Token Cap</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in user_metrics %}
+                <tr data-userid="{{ u.userId }}">
+                    <td>
+                        <div class="u-name">{{ u.name or '—' }}</div>
+                        <div class="u-email">{{ u.email }}</div>
+                    </td>
+                    <td>
+                        <span class="role-pill {{ 'admin' if u.role == 'admin' else 'user' }}">{{ u.role }}</span>
+                    </td>
+                    <td>
+                        <input class="mini-input" type="number" min="0" value="{{ u.documentsUsed }}"
+                            id="used-{{ u.userId }}" title="Documents used"> /
+                        <input class="mini-input" type="number" min="0" value="{{ u.documentsLimit }}"
+                            id="limit-{{ u.userId }}" title="Documents limit">
+                    </td>
+                    <td>{{ u.filesExtracted }}</td>
+                    <td title="{% for name, c in u.services.items() %}{{ name }}: {{ c }}&#10;{% endfor %}">
+                        {{ u.servicesCount }}
+                        {% if u.servicesCount %}<span class="svc-hint">ⓘ</span>{% endif %}
+                    </td>
+                    <td>{{ '{:,}'.format(u.tokensThisMonth) }}
+                        <span class="u-email">({{ u.callsThisMonth }} calls)</span>
+                    </td>
+                    <td>
+                        <input class="mini-input wide" type="number" min="0"
+                            placeholder="∞ unlimited"
+                            value="{{ u.monthlyTokenLimit if u.monthlyTokenLimit is not none else '' }}"
+                            id="tlimit-{{ u.userId }}" title="Blank = unlimited">
+                    </td>
+                    <td>
+                        <button class="btn-save-row" onclick="saveRow('{{ u.userId }}')">Save</button>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not user_metrics %}
+                <tr><td colspan="8" style="text-align:center; color: var(--text-muted);">No users found.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    function authHeaders() {
+        const token = localStorage.getItem('token');
+        return { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+    }
+
+    async function saveRow(userId) {
+        const used = parseInt(document.getElementById(`used-${userId}`).value, 10);
+        const limit = parseInt(document.getElementById(`limit-${userId}`).value, 10);
+        const tlimitRaw = document.getElementById(`tlimit-${userId}`).value.trim();
+        const tlimit = tlimitRaw === '' ? null : parseInt(tlimitRaw, 10);
+
+        const btn = document.querySelector(`tr[data-userid="${userId}"] .btn-save-row`);
+        const original = btn.textContent;
+        btn.textContent = 'Saving…'; btn.disabled = true;
+
+        try {
+            const r1 = await fetch(`/admin/users/${userId}/credits`, {
+                method: 'PUT', headers: authHeaders(),
+                body: JSON.stringify({
+                    documentsUsed: isNaN(used) ? null : used,
+                    documentsLimit: isNaN(limit) ? null : limit
+                })
+            });
+            const r2 = await fetch(`/admin/users/${userId}/token-limit`, {
+                method: 'PUT', headers: authHeaders(),
+                body: JSON.stringify({ monthlyTokenLimit: tlimit })
+            });
+            if (r1.ok && r2.ok) {
+                btn.textContent = '✓ Saved';
+            } else {
+                const e = await (r1.ok ? r2 : r1).json().catch(() => ({}));
+                btn.textContent = 'Error';
+                alert('Save failed: ' + (e.detail || 'unknown error'));
+            }
+        } catch (e) {
+            btn.textContent = 'Error';
+            alert('Network error while saving.');
+        } finally {
+            setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1800);
+        }
+    }
+</script>
+
+<style>
+    .admin-summary {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+    .sum-card {
+        background: var(--bg-card);
+        border: 1px solid var(--glass-border);
+        border-radius: 14px;
+        padding: 1.25rem 1.5rem;
+    }
+    .sum-value { font-size: 1.8rem; font-weight: 800; color: var(--text-main); }
+    .sum-label { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem; }
+    .admin-note { color: var(--text-muted); font-size: 0.85rem; margin: 0 0 1.25rem; }
+
+    .u-name { font-weight: 600; color: var(--text-main); }
+    .u-email { font-size: 0.78rem; color: var(--text-muted); }
+
+    .role-pill { padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.72rem;
+        font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+    .role-pill.admin { background: rgba(251,191,36,0.15); color: var(--primary); }
+    .role-pill.user { background: rgba(255,255,255,0.06); color: var(--text-muted); }
+
+    .mini-input {
+        width: 64px; padding: 0.35rem 0.5rem;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid var(--glass-border);
+        border-radius: 6px; color: var(--text-main); font-size: 0.85rem;
+    }
+    .mini-input.wide { width: 110px; }
+    .svc-hint { color: var(--text-muted); cursor: help; font-size: 0.8rem; }
+
+    .btn-save-row {
+        background: var(--primary); color: #000; border: none;
+        padding: 0.4rem 0.9rem; border-radius: 6px; font-weight: 600;
+        font-size: 0.8rem; cursor: pointer;
+    }
+    .btn-save-row:disabled { opacity: 0.6; cursor: default; }
+
+    @media (max-width: 1100px) {
+        .admin-summary { grid-template-columns: repeat(2, 1fr); }
+    }
+</style>
+{% endblock %}

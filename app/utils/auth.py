@@ -2,6 +2,14 @@ from fastapi import Header, HTTPException, Depends
 from typing import Optional
 from app.services.auth_service import auth_service
 from app.models.user import UserResponse
+from app.config import settings
+
+
+def user_is_admin(user: UserResponse) -> bool:
+    """A user is an admin if flagged in DB OR present in the ADMIN_EMAILS allowlist."""
+    return getattr(user, "role", "user") == "admin" or settings.is_admin_email(
+        getattr(user, "email", None)
+    )
 
 async def get_current_user(authorization: Optional[str] = Header(None)) -> UserResponse:
     print(f"[Auth] Authorization Header: {authorization[:20]}..." if authorization else "[Auth] No Authorization Header")
@@ -41,5 +49,19 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> UserR
     user = await auth_service.find_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
-        
+
+    # Attribute any LLM token usage during this request to this user.
+    try:
+        from app.services.usage_service import set_usage_context
+        set_usage_context(user_id)
+    except Exception:
+        pass
+
     return UserResponse.from_orm(user)
+
+
+async def require_admin(current_user: UserResponse = Depends(get_current_user)) -> UserResponse:
+    """Dependency that allows only admin accounts (allowlist or role=admin)."""
+    if not user_is_admin(current_user):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user

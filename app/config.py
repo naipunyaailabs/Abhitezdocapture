@@ -16,6 +16,17 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "your-secret-key" # SHOULD BE CHANGED IN PROD
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 # 24 hours
+
+    # Admin access — only these accounts can see the Admin Access page.
+    # Comma-separated override via ADMIN_EMAILS env var; matched case-insensitively.
+    ADMIN_EMAILS: str = os.getenv(
+        "ADMIN_EMAILS",
+        "Licenses@cognitbotz.com,AjayKumarB@cognitbotz.com",
+    )
+    # Initial password seeded for admin accounts on first startup.
+    ADMIN_INITIAL_PASSWORD: str = os.getenv(
+        "ADMIN_INITIAL_PASSWORD", "NaipunyaAiLabs@123"
+    )
     
     # LLM Config
     AI_CLIENT: str = "groq"
@@ -39,6 +50,18 @@ class Settings(BaseSettings):
         env_file = ".env"
         case_sensitive = True
         extra = "ignore"
+
+    @property
+    def admin_emails_set(self) -> set[str]:
+        """Lower-cased set of admin emails for case-insensitive checks."""
+        return {
+            e.strip().lower()
+            for e in self.ADMIN_EMAILS.split(",")
+            if e.strip()
+        }
+
+    def is_admin_email(self, email: str | None) -> bool:
+        return bool(email) and email.strip().lower() in self.admin_emails_set
 
 settings = Settings()
 

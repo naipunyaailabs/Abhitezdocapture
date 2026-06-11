@@ -184,6 +184,52 @@ class AuthService:
             print(f"Error finding user by verification token: {e}")
         return None
 
+    async def ensure_admin_accounts(self):
+        """Idempotently ensure the configured admin accounts exist with role=admin,
+        a verified email, and the initial password. Resets the password for ALL
+        admin accounts to the configured initial password (per requirement)."""
+        from app.config import settings as _settings
+
+        db = await get_database()
+        if db is None:
+            print("[AuthService] ensure_admin_accounts: DB is None, skipping")
+            return
+
+        hashed = self.hash_password(_settings.ADMIN_INITIAL_PASSWORD)
+        for email in sorted(_settings.admin_emails_set):
+            existing = await db.users.find_one(
+                {"email": {"$regex": f"^{email}$", "$options": "i"}}
+            )
+            if existing:
+                await db.users.update_one(
+                    {"_id": existing["_id"]},
+                    {"$set": {
+                        "role": "admin",
+                        "emailVerified": True,
+                        "password": hashed,
+                    }},
+                )
+                print(f"[AuthService] Admin ensured (updated): {email}")
+            else:
+                user_id = str(uuid.uuid4())
+                doc = UserInDB(
+                    name=email.split("@")[0],
+                    email=email,
+                    userId=user_id,
+                    role="admin",
+                    password=hashed,
+                    emailVerified=True,
+                    agreedToTermsAt=datetime.now(),
+                ).model_dump()
+                await db.users.insert_one(doc)
+                # Give the new admin a subscription so the dashboard renders.
+                try:
+                    from app.services.subscription_service import subscription_service
+                    await subscription_service.create_trial(user_id)
+                except Exception as e:
+                    print(f"[AuthService] admin trial create note: {e}")
+                print(f"[AuthService] Admin ensured (created): {email}")
+
     async def update_user(self, user_id: str, updates: Dict[str, Any]) -> Optional[UserInDB]:
         db = await get_database()
         try:

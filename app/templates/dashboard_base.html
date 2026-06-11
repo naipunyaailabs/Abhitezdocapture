@@ -27,6 +27,11 @@
             <a href="/dashboard/settings" class="nav-item {% if active_page == 'settings' %}active{% endif %}">
                 <span class="icon">⚙️</span> Settings
             </a>
+            {% if is_admin %}
+            <a href="/dashboard/admin" class="nav-item {% if active_page == 'admin' %}active{% endif %}">
+                <span class="icon">🛡️</span> Admin Access
+            </a>
+            {% endif %}
         </nav>
         <div style="margin-top: auto; padding: 1.5rem;">
             <div class="usage-card">
