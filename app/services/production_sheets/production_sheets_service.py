@@ -37,13 +37,11 @@ from app.services.register_extractor.register_service import register_extractor_
 from app.services.register_extractor.ocr_engine import parse_llm_json
 
 
-# Vision model for production-sheet OCR. Maverick (128-expert) is markedly more
-# accurate on handwritten digits than Scout (16-expert) — it reduces the common
-# 0/8, 2/4, 6/0, 3/8 confusions. Override via PRODUCTION_SHEETS_VISION_MODEL.
+# Vision model for production-sheet OCR. Override via PRODUCTION_SHEETS_VISION_MODEL.
 import os as _os
 VISION_MODEL = _os.getenv(
     "PRODUCTION_SHEETS_VISION_MODEL",
-    "meta-llama/llama-4-maverick-17b-128e-instruct",
+    "meta-llama/llama-4-scout-17b-16e-instruct",
 )
 # Number of independent extraction passes whose results are merged by majority
 # vote per cell. Digit misreads are semi-random, so voting cancels most of them.
