@@ -170,22 +170,28 @@ ROWS_SYSTEM_PROMPT = (
     "alignment.\n\n"
 
     "EXTRACT ONLY THESE 7 COLUMNS, IN THIS EXACT ORDER:\n"
-    "  1. LOT NO      — lot number (4-6 digits)\n"
-    "  2. STYLE CODE  — style code (5-6 digits)\n"
-    "  3. IO NUMBER   — IO / item-order number (usually 5 digits)\n"
-    "  4. ShadeCode   — shade code (digits or short alphanumeric, or blank)\n"
-    "  5. TeamCode    — team code (short code/number, or blank)\n"
-    "  6. PCS         — pieces (whole number, or blank)\n"
-    "  7. KGS         — weight in kg (integer or decimal, or blank)\n\n"
+    "  1. LOT NO      — lot number, typically 5 digits (e.g. 27456, 27382, 27260)\n"
+    "  2. STYLE CODE  — style code, typically 6 digits starting with 1 (e.g. 118155, 116665, 118229)\n"
+    "  3. IO NUMBER   — IO / item-order number, typically 5 digits (e.g. 84968, 85090, 85000)\n"
+    "  4. ShadeCode   — shade code, typically 4 digits (e.g. 1459, 9180) or blank\n"
+    "  5. TeamCode    — team code, typically 4 digits (e.g. 1158, 4990, 3145, 4883) or blank\n"
+    "  6. PCS         — pieces count, whole number (e.g. 1200, 3048, 2240) or blank\n"
+    "  7. KGS         — weight in kg, integer or decimal (e.g. 708.6, 1261.8, 1382) or blank\n\n"
 
     "IMPORTANT — THE FORM MAY HAVE MORE COLUMNS THAN THESE 7:\n"
-    "Some versions of the form ALSO print COLOR NAME, DESIGN, BUYER, SIZE and\n"
-    "TEAM NAME columns. You MUST IGNORE those extra columns entirely. Map only\n"
-    "the columns listed above. The header labels to anchor on are:\n"
-    "  LOT NO, STYLE CODE, IO (or IO NUMBER), SHADE NO / ShadeCode,\n"
-    "  TeamCode / TEAM CODE, PCS, KGS.\n"
-    "Pick the value from UNDER each of those labelled columns. Do not pull the\n"
-    "value from a COLOR/DESIGN/BUYER/SIZE column into one of the 7 outputs.\n\n"
+    "Some versions (especially FNS TO CONT/OUTSIDE) ALSO print COLOR NAME, DESIGN,\n"
+    "BUYER, SIZE, and TEAM NAME columns between IO NUMBER and TEAM CODE.\n"
+    "You MUST IGNORE those extra columns entirely. Anchor on the PRINTED HEADER LABELS:\n"
+    "  LOT NO → column 1\n"
+    "  STYLE CODE → column 2\n"
+    "  IO (or IO NUMBER) → column 3\n"
+    "  SHADE NO (or ShadeCode) → column 4\n"
+    "  TEAM CODE (or TeamCode) → column 5  ← this is always a NUMBER like 1158, 4990, NOT a name\n"
+    "  PCS → column 6\n"
+    "  KGS → column 7\n"
+    "The TEAM NAME column (which contains person names like MONOJ, PAWAN, VISHAN, SAVITA,\n"
+    "PANKAJ, HARPAL, RAGHU, TINKU) is NOT the TeamCode. TeamCode is always the numeric\n"
+    "code in the TEAM CODE column, never a name. Do NOT put a name into TeamCode.\n\n"
 
     "DITTO MARKS — CRITICAL, READ THIS CAREFULLY:\n"
     "These sheets use DITTO marks to mean 'same value as the cell directly\n"
@@ -215,32 +221,84 @@ ROWS_SYSTEM_PROMPT = (
     "- A genuinely EMPTY cell (no mark at all, nothing written) → output \"\".\n"
     "  Use \"^\" ONLY when a ditto mark is actually drawn in the cell.\n"
     "\n"
-    "EXAMPLE (IO NUMBER and ShadeCode dittoed under a block; STYLE CODE changes):\n"
-    "Row 1 written: LOT 27098, STYLE 118158, IO 84668, Shade 14\n"
-    "Row 2 below it: LOT ditto, STYLE 118156 (written), IO ditto, Shade ditto\n"
-    "Row 3 below it: LOT ditto, STYLE 118157 (written), IO ditto, Shade ditto\n"
-    "→ Row 1: [\"27098\", \"118158\", \"84668\", \"14\", ...]\n"
-    "→ Row 2: [\"^\", \"118156\", \"^\", \"^\", ...]\n"
-    "→ Row 3: [\"^\", \"118157\", \"^\", \"^\", ...]\n\n"
+    "REAL EXAMPLE from an actual FNS TO CONT/OUTSIDE sheet:\n"
+    "The sheet has columns: LOT NO | STYLE CODE | IO NUMBER | SHADE NO | [COLOR NAME] |\n"
+    "[DESIGN] | [BUYER] | [SIZE] | [TEAM NAME] | TEAM CODE | PCS | KGS\n"
+    "The bracketed columns are IGNORED. Extract only the 7 green columns.\n"
+    "\n"
+    "Row 1 written: LOT=27456, STYLE=118155, IO=84968, SHADE=1459, [COLOR=WHITE],\n"
+    "               [DESIGN=H.BETTER], [BUYER=W-S.P], [SIZE=27260], [NAME=MONOJ],\n"
+    "               TEAMCODE=1158, PCS=1200, KGS=708.6\n"
+    "Row 2: LOT=do, STYLE=118155, IO=do, SHADE=do, [...], [NAME=PAWAN], TEAMCODE=4990, PCS=do, KGS=do\n"
+    "Row 3: LOT=27385, STYLE=118229, IO=85000, SHADE=do, [...], [NAME=VISHAN], TEAMCODE=3145, PCS=3048, KGS=1261.8\n"
+    "Row 4: LOT=27382, STYLE=116665, IO=85090, SHADE=9180, [...], [NAME=SAVITA], TEAMCODE=4883, PCS=2240, KGS=1382\n"
+    "Row 5: LOT=27260, STYLE=118156, IO=84968, SHADE=1459, [...], [NAME=PANKAJ], TEAMCODE=4882, PCS=2340, KGS=453.9\n"
+    "\n"
+    "Correct output for rows 1-3 (ignoring bracketed columns, ditto → ^):\n"
+    "→ [\"27456\", \"118155\", \"84968\", \"1459\", \"1158\", \"1200\", \"708.6\"]\n"
+    "→ [\"^\", \"118155\", \"^\", \"^\", \"4990\", \"^\", \"^\"]\n"
+    "→ [\"27385\", \"118229\", \"85000\", \"^\", \"3145\", \"3048\", \"1261.8\"]\n"
+    "\n"
+    "Notice: TEAM NAME (MONOJ, PAWAN, VISHAN) is IGNORED. TEAM CODE (1158, 4990, 3145)\n"
+    "is extracted as TeamCode. Never confuse the two.\n\n"
 
-    "ZERO vs BLANK vs DITTO:\n"
+    "ZERO vs BLANK vs DITTO — NO EMPTY CELLS UNLESS TRULY EMPTY:\n"
     "- A handwritten '0' → output \"0\".\n"
     "- A ditto mark in the cell → output \"^\" (the system resolves it).\n"
     "- A completely blank cell with NO mark at all → output \"\".\n"
-    "- Do NOT confuse zero with blank, and do NOT confuse a ditto with a blank.\n\n"
+    "- Do NOT confuse zero with blank, and do NOT confuse a ditto with a blank.\n"
+    "- CRITICAL: If a cell has ANY mark, digit, letter, or symbol written in it —\n"
+    "  even faint or small — you MUST read and output it. Output \"\" ONLY when the\n"
+    "  cell is COMPLETELY EMPTY (white paper, nothing written at all). A cell with\n"
+    "  a number like 9 or 14 that you are uncertain about is NOT empty — output your\n"
+    "  best read of it. Do NOT leave ShadeCode, TeamCode, PCS, or KGS blank just\n"
+    "  because they are hard to read. If you see ink, output a value.\n\n"
 
     "HANDWRITTEN DIGIT DISCIPLINE — THE #1 SOURCE OF ERRORS:\n"
-    "Read each digit by its actual drawn shape. Do NOT pattern-guess. These pairs\n"
-    "are the most commonly CONFUSED — look carefully and pick the one truly drawn:\n"
-    "  • 0 vs 8 : 0 is a single open loop; 8 has a pinched waist (two stacked loops).\n"
-    "  • 0 vs 6 : 6 has a tail/hook curling up into the loop; 0 is a clean oval.\n"
-    "  • 2 vs 4 : 2 has a rounded top and a flat baseline; 4 has a straight\n"
-    "             vertical stroke and an open or closed triangle, no baseline curve.\n"
-    "  • 3 vs 8 : 3 is open on the LEFT (two right-facing bumps); 8 is fully closed.\n"
-    "  • 1 vs 7 : 7 has a horizontal top bar; 1 does not.\n"
-    "  • 5 vs 6 : 5 has a flat top and open bottom curve; 6 is a closed lower loop.\n"
-    "Transcribe the digits you SEE, never what you expect a code 'should' be.\n"
-    "Read every digit of a number left-to-right; do not drop or add digits.\n\n"
+    "Read each digit by its actual drawn shape. Do NOT pattern-guess or substitute\n"
+    "based on what a code 'should' look like. These pairs are the most commonly\n"
+    "CONFUSED — study the shape before deciding:\n"
+    "\n"
+    "  • 2 vs 8 : THE MOST CRITICAL PAIR ON THESE SHEETS.\n"
+    "             REAL CONFIRMED EXAMPLES from actual sheets:\n"
+    "               27456 → the leading digit is 2 (flat base, curved top-hook)\n"
+    "               27382 → starts with 2 (flat base) NOT 87382\n"
+    "               27260 → starts with 2, also has 2 in 3rd position\n"
+    "               27385 → starts with 2\n"
+    "             On these sheets, LOT numbers nearly always start with 2 (2xxxx).\n"
+    "             If you read a LOT starting with 8, STOP and re-examine — it is\n"
+    "             almost certainly a 2 misread as 8.\n"
+    "             SHAPE: 2 has a CURVED TOP hooking left, diagonal down-right stroke,\n"
+    "             FLAT horizontal baseline. 8 has TWO FULLY CLOSED LOOPS with a\n"
+    "             pinched waist — looks like a figure-8. Flat bottom = 2. Two loops = 8.\n"
+    "\n"
+    "  • 1 vs 7 in STYLE CODE: Style codes on these sheets typically start with 11\n"
+    "             (e.g. 118155, 116665, 118229). If you read a style starting with 77\n"
+    "             or 71, re-examine — the first digit is almost certainly 1.\n"
+    "             SHAPE: 7 has a clear horizontal top bar; 1 is a plain vertical stroke.\n"
+    "\n"
+    "  • 0 vs 8 : 0 is a SINGLE open oval/loop with no pinch; 8 has a pinched\n"
+    "             waist — two stacked loops touching in the middle.\n"
+    "             REAL EXAMPLE: IO NUMBER 84968 — the last digit is 8 (two loops),\n"
+    "             not 0 (single loop). IO 85090 — ends in 0 (single oval), not 8.\n"
+    "\n"
+    "  • 0 vs 6 : 6 has a TAIL/HOOK curling upward into the loop; 0 is a clean\n"
+    "             closed oval with no tail. REAL EXAMPLE: shade 9180 ends in 0,\n"
+    "             not 6. Shade 1459 — last digit is 9 (descending loop), not 0.\n"
+    "\n"
+    "  • 2 vs 4 : 2 has a rounded/curved top and a FLAT HORIZONTAL baseline.\n"
+    "             4 has a straight vertical right-stroke and an open triangle top —\n"
+    "             NO flat base. REAL EXAMPLE: 2240 has a 2 as first digit (flat\n"
+    "             base), and 4 as third digit (open triangle, no base).\n"
+    "\n"
+    "  • 3 vs 8 : 3 is OPEN on the LEFT (two right-facing bumps); 8 is FULLY CLOSED.\n"
+    "  • 5 vs 6 : 5 has a flat top and open bottom curve; 6 has a closed lower loop.\n"
+    "  • 9 vs 4 : 9 has a closed circle on top with a descending tail; 4 has no circle.\n"
+    "\n"
+    "DECISION RULE: Before writing a digit, ask — does this have a flat base (→ 2),\n"
+    "two closed loops (→ 8), a top bar (→ 7), or a plain stroke (→ 1)? Commit to\n"
+    "the shape you see. Do not change your answer based on what 'looks like a valid\n"
+    "code'. Read every digit left-to-right; do not drop or add digits.\n\n"
 
     "INTEGER COLUMNS — NO DECIMAL POINTS:\n"
     "LOT NO, STYLE CODE, IO NUMBER, ShadeCode, TeamCode, and PCS are WHOLE NUMBERS.\n"
@@ -266,15 +324,16 @@ ROWS_SYSTEM_PROMPT = (
     "correct for something you cannot read.\n\n"
 
     "OUTPUT — RETURN ONLY VALID JSON, no prose, no markdown fences.\n"
-    "In the example below, row 1 has real written values; rows 2-3 have ditto\n"
-    "marks under LOT NO, IO NUMBER and ShadeCode, so those become \"^\", while the\n"
-    "STYLE CODE, PCS and KGS that are written change every row:\n"
+    "Real example (FNS TO CONT/OUTSIDE sheet — LOT and IO ditto down, TeamCode and\n"
+    "STYLE CODE and PCS/KGS written on each row):\n"
     "{\n"
     "  \"headers\": [\"LOT NO\", \"STYLE CODE\", \"IO NUMBER\", \"ShadeCode\", \"TeamCode\", \"PCS\", \"KGS\"],\n"
     "  \"rows\": [\n"
-    "    [\"27098\", \"118158\", \"84668\", \"14\", \"\", \"769\", \"470\"],\n"
-    "    [\"^\", \"118156\", \"^\", \"^\", \"\", \"3060\", \"593\"],\n"
-    "    [\"^\", \"118157\", \"^\", \"^\", \"\", \"315\", \"108\"]\n"
+    "    [\"27456\", \"118155\", \"84968\", \"1459\", \"1158\", \"1200\", \"708.6\"],\n"
+    "    [\"^\", \"118155\", \"^\", \"^\", \"4990\", \"^\", \"^\"],\n"
+    "    [\"27385\", \"118229\", \"85000\", \"^\", \"3145\", \"3048\", \"1261.8\"],\n"
+    "    [\"27382\", \"116665\", \"85090\", \"9180\", \"4883\", \"2240\", \"1382\"],\n"
+    "    [\"27260\", \"118156\", \"84968\", \"1459\", \"4882\", \"2340\", \"453.9\"]\n"
     "  ],\n"
     "  \"confidence\": 0.95\n"
     "}\n\n"
@@ -293,24 +352,43 @@ ROWS_SYSTEM_PROMPT = (
     "3. A cell is \"\" ONLY when it is genuinely empty (no mark at all).\n"
     "4. ZEROS are \"0\" not \"\".\n"
     "5. NO value shifting, NO merging, NO skipping.\n"
-    "6. NO explanations — ONLY JSON output."
+    "6. NO explanations — ONLY JSON output.\n"
+    "7. LOT NO sanity check: on these sheets LOT numbers are 5-digit numbers\n"
+    "   almost always starting with 2 (e.g. 27xxx). If you read a LOT starting\n"
+    "   with 8, re-examine the first digit — it is very likely a 2 misread as 8.\n"
+    "8. STYLE CODE sanity check: style codes are 6 digits typically starting\n"
+    "   with 11 (e.g. 118xxx, 116xxx). If you read 77xxx or 71xxx, re-examine.\n"
+    "9. TEAM CODE is always a 4-digit number (e.g. 1158, 4990, 4883). It is NEVER\n"
+    "   a person's name. The TEAM NAME column (person names) must be ignored.\n"
+    "10. COUNT the physical data rows on the page. Output EXACTLY that many rows.\n"
+    "    Do NOT repeat, duplicate, or omit any row."
 )
 
 ROWS_USER_PROMPT = (
-    "This is a daily production register page. Read EVERY visible data row. For "
-    "each row output EXACTLY 7 values in order: LOT NO, STYLE CODE, IO NUMBER, "
-    "ShadeCode, TeamCode, PCS, KGS. Ignore any COLOR NAME / DESIGN / BUYER / "
-    "SIZE / TEAM NAME columns.\n"
-    "IMPORTANT: This sheet uses DITTO marks (\", ,, do, dash) that mean 'same as "
-    "the cell directly above in this column'. For ANY cell that contains a ditto "
-    "mark, output the single caret \"^\" — do NOT copy the value yourself and do "
-    "NOT leave it blank. Decide ^ vs a real value SEPARATELY for each column: "
-    "LOT NO, IO NUMBER and ShadeCode are often dittoed (=\"^\") down a block while "
-    "STYLE CODE, PCS and KGS hold their own written values on every row. Output "
-    "\"\" only for a genuinely empty cell with no mark. NEVER put a STYLE CODE "
-    "value into the LOT NO column.\n"
-    "Return complete JSON with ALL rows, ALL 7 columns per row, and a "
-    "confidence score."
+    "Production register page — extract ONLY these 7 columns per row:\n"
+    "LOT NO | STYLE CODE | IO NUMBER | ShadeCode | TeamCode | PCS | KGS\n"
+    "IGNORE all other printed columns (COLOR NAME, DESIGN, BUYER, SIZE, TEAM NAME).\n"
+    "\n"
+    "REAL VALUE RANGES (use these as sanity checks):\n"
+    "  LOT NO: 5 digits, almost always starts with 2 (e.g. 27456, 27382, 27260).\n"
+    "          If you read a LOT starting with 8, it is almost certainly a 2.\n"
+    "  STYLE CODE: 6 digits, typically starts with 11 (e.g. 118155, 116665, 118229).\n"
+    "  IO NUMBER: 5 digits (e.g. 84968, 85090, 85000).\n"
+    "  ShadeCode: 4 digits (e.g. 1459, 9180).\n"
+    "  TeamCode: 4-digit NUMBER only (e.g. 1158, 4990, 3145, 4883, 4882).\n"
+    "            NOT a person name. The TEAM NAME column is IGNORED.\n"
+    "  PCS: whole number (e.g. 1200, 3048, 2240, 2340).\n"
+    "  KGS: integer or decimal (e.g. 708.6, 1261.8, 1382, 453.9).\n"
+    "\n"
+    "DITTO MARKS ('do', \", ,, dash) = same as the cell directly ABOVE in that column.\n"
+    "Output \"^\" for any ditto cell. Decide ^ PER COLUMN independently.\n"
+    "Output \"\" ONLY for a completely empty cell (nothing written at all).\n"
+    "\n"
+    "DIGIT RULE — 2 vs 8: LOT numbers start with 2 (flat-base digit), not 8 (two loops).\n"
+    "If uncertain on the first digit of a LOT, choose 2.\n"
+    "\n"
+    "COUNT rows on the page first. Output EXACTLY that many rows — no duplicates.\n"
+    "Return complete JSON: all rows, all 7 columns per row, and confidence score."
 )
 
 
@@ -397,6 +475,10 @@ def _clean_cell(col: str, val: str) -> str:
       ('1234.0' → '1234', '12.34' → '1234'), and strips stray non-digit noise
       while leaving purely-alphanumeric codes intact.
     - KGS keeps a single decimal if present.
+    - LOT NO: 5-digit values starting with 8 are almost certainly a 2 misread
+      as 8 (the most common OCR error on these sheets). Correct 8xxxx → 2xxxx.
+    - STYLE CODE: 6-digit values starting with 7 are almost certainly a 1
+      misread (77xxxx or 71xxxx → 11xxxx). Correct first digit 7→1.
     """
     v = (val or "").strip()
     if v == "" or v == DITTO_SENTINEL:
@@ -410,7 +492,18 @@ def _clean_cell(col: str, val: str) -> str:
             v = _re.sub(r"\.0*$", "", v)
             # Any remaining dots are stray marks between digits ('12.34' is a
             # misread of '1234' in an integer column) — remove them.
-            return v.replace(".", "")
+            v = v.replace(".", "")
+
+        # LOT NO sanity correction: 5-digit lots on these sheets start with 2.
+        # An 8 as the leading digit of a 5-digit lot is a 2 vs 8 OCR error.
+        if col == "LOT NO" and _re.fullmatch(r"\d{5}", v) and v[0] == "8":
+            v = "2" + v[1:]
+
+        # STYLE CODE sanity correction: 6-digit style codes start with 1 (11xxxx).
+        # A leading 7 (71xxxx or 77xxxx) is a 1 vs 7 OCR error.
+        if col == "STYLE CODE" and _re.fullmatch(r"\d{6}", v) and v[0] == "7":
+            v = "1" + v[1:]
+
         return v
 
     if col == "KGS":
@@ -532,6 +625,23 @@ async def _extract_page_rows_once(img_base64: str, page_num: int):
         return None, 0.0
 
 
+def _deduplicate_adjacent(rows: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    """Remove adjacent rows that are exact duplicates of each other.
+
+    The LLM sometimes emits the last physical row of a page twice when the row
+    sits near the bottom margin. Since identical consecutive rows never occur on
+    these production sheets (each row is a unique lot/style entry), any adjacent
+    duplicate is a hallucination and can be safely dropped.
+    """
+    if not rows:
+        return rows
+    result = [rows[0]]
+    for row in rows[1:]:
+        if row != result[-1]:
+            result.append(row)
+    return result
+
+
 def _vote_rows(passes: List[List[Dict[str, str]]]) -> List[Dict[str, str]]:
     """Merge multiple extraction passes by majority vote PER CELL.
 
@@ -545,12 +655,13 @@ def _vote_rows(passes: List[List[Dict[str, str]]]) -> List[Dict[str, str]]:
     if not valid:
         return []
     if len(valid) == 1:
-        return valid[0]
+        return _deduplicate_adjacent(valid[0])
 
-    # Use the most common row count as the canonical length; prefer the longest
-    # among the modal set so we don't silently drop rows a pass actually read.
+    # Use the most common row count as the canonical length. When counts tie,
+    # prefer the SHORTER length — a pass that added a phantom duplicate row
+    # inflates the count, so we should not reward it.
     length_counts = Counter(len(p) for p in valid)
-    modal_len = max(length_counts, key=lambda L: (length_counts[L], L))
+    modal_len = max(length_counts, key=lambda L: (length_counts[L], -L))
     # The reference pass is the first one whose length matches the modal length.
     reference = next((p for p in valid if len(p) == modal_len), valid[0])
 
@@ -579,7 +690,8 @@ def _vote_rows(passes: List[List[Dict[str, str]]]) -> List[Dict[str, str]]:
                 ref_val = (reference[i].get(col, "") or "").strip()
                 row[col] = ref_val if ref_val in tied else tied[0]
         merged.append(row)
-    return merged
+
+    return _deduplicate_adjacent(merged)
 
 
 async def _extract_page_rows(img_base64: str, page_num: int) -> Tuple[List[Dict[str, str]], float]:
