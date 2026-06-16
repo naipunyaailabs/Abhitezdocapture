@@ -28,9 +28,11 @@ vision prompts. Fixed columns, no template picking, stateless.
 
 from __future__ import annotations
 
+import base64
+import io
 import json
 import re as _re
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from app.services.llm_service import llm_service
 from app.services.register_extractor.register_service import register_extractor_service
@@ -448,14 +450,60 @@ async def _detect_sheet_type(img_base64: str) -> str:
     return DEFAULT_SHEET_TYPE
 
 
-async def _extract_page_date(img_base64: str) -> Tuple[str, str]:
-    """Read the DATE (and optional shift) header field from a page image.
-    Returns (date_string, shift_string)."""
+# Fraction of the page height that holds the DATE/SHIFT header strip. The date
+# line sits in the top band above the title banner; 0.22 captures it with margin.
+_HEADER_BAND_FRACTION = float(_os.getenv("PRODUCTION_SHEETS_HEADER_FRACTION", "0.22"))
+# Target width (px) to upscale the cropped header to, so the small handwritten
+# date/shift digits are large enough for the vision model to resolve.
+_HEADER_TARGET_WIDTH = int(_os.getenv("PRODUCTION_SHEETS_HEADER_WIDTH", "1600"))
+
+
+def _crop_header_band(img_base64: str) -> Optional[str]:
+    """Crop the top header strip of the page and upscale it.
+
+    The DATE/SHIFT fields sit in a thin band at the very top of the page. On a
+    downscaled full-page image that text is too small for the vision model to
+    read, so it returns an empty date. Cropping just the header and enlarging it
+    gives the model a clear, high-resolution view of the date/shift line.
+
+    Returns a base64 JPEG of the enlarged header, or None if anything fails
+    (the caller then falls back to the full page).
+    """
+    try:
+        from PIL import Image, ImageEnhance
+        raw = base64.b64decode(img_base64)
+        img = Image.open(io.BytesIO(raw)).convert("RGB")
+        w, h = img.size
+        band_h = max(1, int(h * _HEADER_BAND_FRACTION))
+        header = img.crop((0, 0, w, band_h))
+
+        # Upscale to a generous target width so digits are large and crisp.
+        hw, hh = header.size
+        if hw < _HEADER_TARGET_WIDTH:
+            scale = _HEADER_TARGET_WIDTH / hw
+            header = header.resize(
+                (int(hw * scale), int(hh * scale)), Image.LANCZOS
+            )
+
+        # Boost contrast/sharpness — blue ink on a printed form is faint.
+        header = ImageEnhance.Contrast(header).enhance(1.4)
+        header = ImageEnhance.Sharpness(header).enhance(1.6)
+
+        buf = io.BytesIO()
+        header.save(buf, format="JPEG", quality=95)
+        return base64.b64encode(buf.getvalue()).decode()
+    except Exception as exc:
+        print(f"[ProductionSheets] header crop failed: {exc}")
+        return None
+
+
+async def _date_call(img_b64: str) -> Tuple[str, str]:
+    """One DATE/SHIFT vision call against the given image. ('', '') on failure."""
     try:
         raw = await llm_service.unified_chat_completion(
             DATE_SYSTEM_PROMPT,
             DATE_USER_PROMPT,
-            image_base64=img_base64,
+            image_base64=img_b64,
             image_mime_type="image/jpeg",
             max_tokens=200,
             model=VISION_MODEL,
@@ -467,10 +515,32 @@ async def _extract_page_date(img_base64: str) -> Tuple[str, str]:
             if shift_val not in ("DAY", "NIGHT"):
                 shift_val = ""
             return date_val, shift_val
-        return "", ""
     except Exception as exc:
-        print(f"[ProductionSheets] DATE extract failed: {exc}")
-        return "", ""
+        print(f"[ProductionSheets] DATE call failed: {exc}")
+    return "", ""
+
+
+async def _extract_page_date(img_base64: str) -> Tuple[str, str]:
+    """Read the DATE (and optional shift) header field from a page image.
+
+    Reads the cropped+upscaled header band FIRST (the date/shift text is tiny on
+    a full page and the model otherwise returns empty). Falls back to the full
+    page for anything the header crop missed. Returns (date_string, shift_string).
+    """
+    date_val, shift_val = "", ""
+
+    header_b64 = _crop_header_band(img_base64)
+    if header_b64:
+        date_val, shift_val = await _date_call(header_b64)
+
+    # Fall back to the full page if the header crop missed either field.
+    if not date_val or not shift_val:
+        full_date, full_shift = await _date_call(img_base64)
+        date_val = date_val or full_date
+        shift_val = shift_val or full_shift
+
+    print(f"[ProductionSheets] DATE result: date='{date_val}' shift='{shift_val}'")
+    return date_val, shift_val
 
 
 # Columns that must be whole numbers — a decimal here is an OCR/noise artifact.
