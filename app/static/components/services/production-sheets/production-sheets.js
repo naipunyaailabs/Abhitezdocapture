@@ -73,6 +73,12 @@ class ProductionSheetsModule {
                             </select>
                             <label>DATE:</label>
                             <input type="text" id="ps-date-input" placeholder="Page date" oninput="productionSheets.onDateEdit(this.value)">
+                            <label>SHIFT:</label>
+                            <select id="ps-shift-select" onchange="productionSheets.onShiftEdit(this.value)">
+                                <option value="">–</option>
+                                <option value="DAY">DAY</option>
+                                <option value="NIGHT">NIGHT</option>
+                            </select>
                         </div>
                         <div class="ps-table-toolbar">
                             <button class="ps-toolbar-btn add" onclick="productionSheets.addRow()">+ Row</button>
@@ -245,6 +251,8 @@ class ProductionSheetsModule {
             document.getElementById("ps-thead").innerHTML = "";
             document.getElementById("ps-tbody").innerHTML = "";
             document.getElementById("ps-date-input").value = "";
+            const shiftSelReset = document.getElementById("ps-shift-select");
+            if (shiftSelReset) shiftSelReset.value = "";
             return;
         }
 
@@ -258,6 +266,11 @@ class ProductionSheetsModule {
         const type = page.sheet_type || PS_DEFAULT_TYPE;
         document.getElementById("ps-type-select").value = PS_SHEET_TYPES[type] ? type : PS_DEFAULT_TYPE;
         document.getElementById("ps-date-input").value = page.date || "";
+        const shiftSel = document.getElementById("ps-shift-select");
+        if (shiftSel) {
+            const sh = (page.shift || "").toUpperCase();
+            shiftSel.value = (sh === "DAY" || sh === "NIGHT") ? sh : "";
+        }
 
         // Table — TeamCode header label depends on the sheet type.
         const teamHeader = psMeta(type).team_header;
@@ -287,6 +300,14 @@ class ProductionSheetsModule {
     onDateEdit(val) {
         const page = this.state.allPages?.[this.state.activePageIndex];
         if (page) page.date = val;
+    }
+
+    onShiftEdit(val) {
+        const page = this.state.allPages?.[this.state.activePageIndex];
+        if (page) {
+            const sh = (val || "").toUpperCase();
+            page.shift = (sh === "DAY" || sh === "NIGHT") ? sh : "";
+        }
     }
 
     onCellEdit(rowIdx, col, val) {
@@ -344,6 +365,7 @@ class ProductionSheetsModule {
                     sheet_label: p.sheet_label || meta.label,
                     team_header: p.team_header || meta.team_header,
                     date: p.date || "",
+                    shift: p.shift || "",
                     rows: p.rows || [],
                 };
             }),

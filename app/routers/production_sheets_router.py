@@ -178,7 +178,7 @@ def _safe_sheet_title(name: str, used: set) -> str:
 
 def _write_sheet(ws, page: Dict[str, Any]):
     """Render one production page into the canonical Abhitex layout:
-        Row 1: DATE : | <date>
+        Row 1: DATE : | <date> | ... | SHIFT : | <shift>
         Row 2: <merged, centered> <SHEET TITLE> across all 7 columns
         Row 3: green column headers (LOT NO ... KGS)
         Rows 4+: data
@@ -188,12 +188,20 @@ def _write_sheet(ws, page: Dict[str, Any]):
     title = page.get("sheet_title") or meta["title"]
     team_header = page.get("team_header") or meta["team_header"]
     date_value = page.get("date", "") or ""
+    shift_value = (page.get("shift", "") or "").strip().upper()
+    if shift_value not in ("DAY", "NIGHT"):
+        shift_value = ""
     rows = page.get("rows", []) or []
 
     n_cols = len(COLUMNS)
 
-    # Row 1: DATE label + value
+    # Row 1: DATE label + value (cols 1-2), SHIFT label + value (cols 6-7).
     ws.cell(row=1, column=1, value="DATE :").font = _HEADER_FONT
+    ws.cell(row=1, column=2, value=date_value)
+    shift_label = ws.cell(row=1, column=n_cols - 1, value="SHIFT :")
+    shift_label.font = _HEADER_FONT
+    shift_label.alignment = _CENTER
+    ws.cell(row=1, column=n_cols, value=shift_value).alignment = _CENTER
 
     # Row 2: centered title banner spanning all columns
     title_cell = ws.cell(row=2, column=1, value=title)
