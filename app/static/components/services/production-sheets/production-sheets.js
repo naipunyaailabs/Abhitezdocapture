@@ -5,6 +5,16 @@
  *
  * Columns: LOT NO, STYLE CODE, IO NUMBER, ShadeCode, TeamCode, PCS, KGS
  * Plus: a DATE field and a detected sheet type captured per page.
+ *
+ * ── Architecture (multi-file / up-to-50-page safe) ───────────────────────────
+ * Each uploaded FILE becomes a "job". Jobs are run through a bounded
+ * concurrency pool (PS_CONCURRENCY at a time) so 50 files extract without
+ * overwhelming the server, and one job's failure or progress never affects
+ * another's. Every extracted PAGE gets a STABLE unique id; the UI is keyed on
+ * that id (never on array position), so a re-render while other pages are still
+ * streaming in can never jump to or overwrite the wrong page. The header
+ * subtitle has a SINGLE authoritative writer (_renderProgress) computed from
+ * job state — there are no competing per-stream counters fighting over it.
  */
 
 console.log("[ProductionSheets] Module loading...");
@@ -22,16 +32,26 @@ const PS_SHEET_TYPES = {
 };
 const PS_DEFAULT_TYPE = "length_heming";
 
+// How many files to extract concurrently. Bounded so the server/LLM is not
+// overwhelmed when many files are uploaded at once.
+const PS_CONCURRENCY = 4;
+
 function psMeta(type) {
     return PS_SHEET_TYPES[type] || PS_SHEET_TYPES[PS_DEFAULT_TYPE];
 }
 
 class ProductionSheetsModule {
     constructor() {
-        this.state = { queue: [], currentIndex: 0, results: [], allPages: [], activePageIndex: 0 };
+        // pages:   ordered list of page records, each with a stable .id.
+        // jobs:    one per uploaded file, tracks per-file extraction status.
+        // activePageId: which page is shown on the right (stable id, not index).
+        this.state = { pages: [], jobs: [], activePageId: null };
+        this._uid = 0;
         this._injectOverlay();
         console.log("[ProductionSheets] Module initialized");
     }
+
+    _nextId(prefix) { return `${prefix}-${++this._uid}`; }
 
     // ─── OVERLAY ─────────────────────────────────────────────
     _injectOverlay() {
@@ -53,10 +73,14 @@ class ProductionSheetsModule {
                         <button class="ps-btn-close" onclick="productionSheets.close()">×</button>
                     </div>
                 </div>
+                <div class="ps-progress-track" id="ps-progress-track"><div class="ps-progress-fill" id="ps-progress-fill"></div></div>
                 <div class="ps-main">
                     <div class="ps-source-panel">
-                        <div class="ps-panel-title">📄 Source Document</div>
-                        <div class="ps-page-tabs" id="ps-page-tabs"></div>
+                        <div class="ps-panel-title">
+                            📄 Source Document
+                            <span class="ps-page-counter" id="ps-page-counter"></span>
+                        </div>
+                        <div class="ps-page-list" id="ps-page-tabs"></div>
                         <div class="ps-image-viewer" id="ps-image-viewer">
                             <p style="color:#64748b;text-align:center;padding:2rem;">Loading...</p>
                         </div>
@@ -96,11 +120,6 @@ class ProductionSheetsModule {
                             <div class="ps-stat">Avg Confidence: <span id="ps-conf">–</span></div>
                         </div>
                     </div>
-                    <div class="ps-loading" id="ps-loading">
-                        <div class="ps-spinner"></div>
-                        <p class="ps-loading-text">Extracting production sheet data...</p>
-                        <p class="ps-loading-sub">Vision AI is reading your document</p>
-                    </div>
                 </div>
             </div>
         `;
@@ -115,43 +134,64 @@ class ProductionSheetsModule {
             alert("No supported files selected (PDF or image).");
             return;
         }
-        this.state.queue = list;
-        this.state.currentIndex = 0;
-        this.state.results = [];
-        this.state.allPages = [];
-        this.state.activePageIndex = 0;
+
+        // Reset state for a fresh batch. Each file → one job.
+        this.state.pages = [];
+        this.state.activePageId = null;
+        this.state.jobs = list.map(file => ({
+            id: this._nextId("job"),
+            file,
+            status: "queued",          // queued | extracting | done | failed
+            totalPages: null,          // filled from the stream metadata event
+            error: null,
+        }));
+
         this._show();
-        await this._processQueue();
+        this._renderTabs();
+        this._renderActivePage();
+        this._renderProgress();
+
+        await this._runPool(this.state.jobs, PS_CONCURRENCY);
+
+        this._renderProgress();
     }
 
-    async _processQueue() {
-        const total = this.state.queue.length;
-        this.state.allPages = this.state.allPages || [];
-        let totalConfs = [];
-
-        for (let i = 0; i < total; i++) {
-            this.state.currentIndex = i;
-            const file = this.state.queue[i];
-            this._setSubtitle(`Processing ${i + 1}/${total}: ${file.name} (streaming...)`);
-            this._setLoading(false);
-            this._show();
-            try {
-                await this._uploadOneStreaming(file, totalConfs);
-            } catch (e) {
-                console.error("[ProductionSheets] extract failed:", e);
-                this._setSubtitle(`Error processing ${file.name}: ${String(e)}`);
+    /** Run an array of jobs through a bounded-concurrency worker pool. */
+    async _runPool(jobs, concurrency) {
+        let cursor = 0;
+        const worker = async () => {
+            while (cursor < jobs.length) {
+                const job = jobs[cursor++];
+                await this._runJob(job);
             }
+        };
+        const workers = [];
+        for (let i = 0; i < Math.min(concurrency, jobs.length); i++) {
+            workers.push(worker());
         }
-
-        this._setLoading(false);
-        this._updateStats(totalConfs);
-        this._setSubtitle(`${this.state.results.length} file(s), ${this.state.allPages.length} page(s) completed`);
+        await Promise.all(workers);
     }
 
-    async _uploadOneStreaming(file, confsArray) {
+    /** Extract one file (job). Fully isolated: never touches other jobs. */
+    async _runJob(job) {
+        job.status = "extracting";
+        job.error = null;
+        this._renderProgress();
+        try {
+            await this._uploadOneStreaming(job);
+            job.status = "done";
+        } catch (e) {
+            console.error("[ProductionSheets] extract failed:", job.file.name, e);
+            job.status = "failed";
+            job.error = String(e);
+        }
+        this._renderProgress();
+    }
+
+    async _uploadOneStreaming(job) {
         const token = this._getToken();
         const fd = new FormData();
-        fd.append("document", file);
+        fd.append("document", job.file);
 
         const res = await fetch("/api/production-sheets/extract-streaming", {
             method: "POST",
@@ -166,37 +206,19 @@ class ProductionSheetsModule {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
-        let pageCount = 0;
-        let totalPages = 0;
-        let firstPageArrived = false;
 
         const handleEvent = (event) => {
             if (event.type === "metadata") {
-                totalPages = event.total_pages || 1;
+                job.totalPages = event.total_pages || 1;
             } else if (event.type === "page") {
-                this.state.allPages.push(event);
-                pageCount++;
-                if (!firstPageArrived) {
-                    firstPageArrived = true;
-                    this.state.activePageIndex = 0;
-                    this._renderTabs();
-                    this._renderActivePage();
-                } else {
-                    this._renderTabs();
-                }
-                const totalRows = this.state.allPages.reduce((s, p) => s + (p.rows || []).length, 0);
-                document.getElementById("ps-row-count").textContent = totalRows;
-                document.getElementById("ps-page-count").textContent = this.state.allPages.length;
-                this._setSubtitle(`✅ Page ${pageCount} done · ${Math.max(0, totalPages - pageCount)} extracting in background...`);
-                if (event.confidence) confsArray.push(event.confidence);
+                this._addPage(job, event);
             } else if (event.type === "page_error") {
-                console.error(`[ProductionSheets] Page ${event.page_number} error:`, event.error);
-                pageCount++;
-                this._renderTabs();
-                this._setSubtitle(`⚠️ Page ${pageCount} failed · ${Math.max(0, totalPages - pageCount)} extracting...`);
+                console.error(`[ProductionSheets] ${job.file.name} page ${event.page_number} error:`, event.error);
+                this._addPageError(job, event);
             } else if (event.type === "error") {
                 throw new Error(event.error);
             }
+            // "complete" is informational; job completion is tracked by _runJob.
         };
 
         while (true) {
@@ -215,39 +237,199 @@ class ProductionSheetsModule {
             try { handleEvent(JSON.parse(buffer)); }
             catch (e) { console.error("[ProductionSheets] parse final buffer failed:", buffer); }
         }
-
-        this.state.results.push({ file: file.name, data: { pages: this.state.allPages } });
     }
 
-    _updateStats(confsArray) {
-        const totalRows = this.state.allPages.reduce((s, p) => s + (p.rows || []).length, 0);
+    /** Insert a freshly-extracted page, keeping pages grouped & ordered by job. */
+    _addPage(job, event) {
+        const page = {
+            id: this._nextId("page"),
+            jobId: job.id,
+            fileName: job.file.name,
+            status: "done",
+            ...event,
+        };
+        this._insertPageForJob(job, page);
+
+        // Auto-show the very first page that arrives in the whole batch.
+        if (this.state.activePageId === null) {
+            this.state.activePageId = page.id;
+            this._renderActivePage();
+        }
+        this._renderTabs();
+        this._renderProgress();
+    }
+
+    _addPageError(job, event) {
+        const page = {
+            id: this._nextId("page"),
+            jobId: job.id,
+            fileName: job.file.name,
+            status: "failed",
+            error: event.error || "extraction failed",
+            page_number: event.page_number,
+            sheet_type: PS_DEFAULT_TYPE,
+            rows: [],
+        };
+        this._insertPageForJob(job, page);
+        this._renderTabs();
+        this._renderProgress();
+    }
+
+    /**
+     * Insert a page so that all pages from the same job stay contiguous and in
+     * the job's original order. With parallel jobs, pages from different files
+     * can arrive interleaved; this keeps the list stable and readable.
+     */
+    _insertPageForJob(job, page) {
+        const jobOrder = this.state.jobs.indexOf(job);
+        const pages = this.state.pages;
+        // Find the first page belonging to a later job; insert just before it.
+        let insertAt = pages.length;
+        for (let i = 0; i < pages.length; i++) {
+            const pj = this.state.jobs.findIndex(j => j.id === pages[i].jobId);
+            if (pj > jobOrder) { insertAt = i; break; }
+        }
+        pages.splice(insertAt, 0, page);
+    }
+
+    // ─── PROGRESS (single authoritative writer) ──────────────
+    _renderProgress() {
+        const jobs = this.state.jobs;
+        const total = jobs.length;
+        const done = jobs.filter(j => j.status === "done").length;
+        const failed = jobs.filter(j => j.status === "failed").length;
+        const running = jobs.filter(j => j.status === "extracting").length;
+        const finished = done + failed;
+
+        const sub = document.getElementById("ps-subtitle");
+        if (finished >= total && total > 0) {
+            const okPages = this.state.pages.filter(p => p.status === "done").length;
+            sub.textContent = failed
+                ? `${done}/${total} file(s) done · ${failed} failed · ${okPages} page(s) extracted`
+                : `✅ ${total} file(s), ${okPages} page(s) completed`;
+        } else {
+            sub.textContent = `Extracting… ${finished}/${total} file(s) done · ${running} running`;
+        }
+
+        // Progress bar.
+        const fill = document.getElementById("ps-progress-fill");
+        const track = document.getElementById("ps-progress-track");
+        if (fill && track) {
+            const pct = total ? Math.round((finished / total) * 100) : 0;
+            fill.style.width = `${pct}%`;
+            track.style.display = (finished >= total && total > 0) ? "none" : "block";
+        }
+
+        this._updateStats();
+    }
+
+    _updateStats() {
+        const okPages = this.state.pages.filter(p => p.status === "done");
+        const totalRows = okPages.reduce((s, p) => s + (p.rows || []).length, 0);
         document.getElementById("ps-row-count").textContent = totalRows;
-        document.getElementById("ps-page-count").textContent = this.state.allPages.length;
-        const avgConf = confsArray.length ? (confsArray.reduce((a, b) => a + b) / confsArray.length) : 0;
+        document.getElementById("ps-page-count").textContent = okPages.length;
+
+        const confs = okPages.map(p => p.confidence).filter(c => c);
+        const avgConf = confs.length ? (confs.reduce((a, b) => a + b, 0) / confs.length) : 0;
         document.getElementById("ps-conf").textContent = avgConf ? `${Math.round(avgConf * 100)}%` : "–";
+
+        const counter = document.getElementById("ps-page-counter");
+        if (counter) counter.textContent = this.state.pages.length ? `${this.state.pages.length} page(s)` : "";
     }
 
     // ─── RENDER ──────────────────────────────────────────────
-    _renderTabs() {
-        const wrap = document.getElementById("ps-page-tabs");
-        const pages = this.state.allPages || [];
-        wrap.innerHTML = pages.map((p, i) => {
-            const label = psMeta(p.sheet_type).label;
-            return `<button class="ps-tab ${i === this.state.activePageIndex ? 'active' : ''}" onclick="productionSheets.switchPage(${i})">P${i + 1} · ${this._esc(label)}</button>`;
-        }).join("");
+    _statusDot(status) {
+        const map = {
+            done:       { cls: "ok",       title: "Extracted" },
+            failed:     { cls: "fail",     title: "Failed" },
+            extracting: { cls: "running",  title: "Extracting…" },
+            queued:     { cls: "queued",   title: "Queued" },
+        };
+        const s = map[status] || map.queued;
+        return `<span class="ps-dot ${s.cls}" title="${s.title}"></span>`;
     }
 
-    switchPage(i) {
-        this.state.activePageIndex = i;
+    _renderTabs() {
+        const wrap = document.getElementById("ps-page-tabs");
+        const pages = this.state.pages || [];
+
+        // Rows already shown for completed pages, plus placeholder rows for the
+        // pages still extracting / queued (so the user sees the full pipeline).
+        const items = [];
+
+        // Completed/extracted/failed pages.
+        pages.forEach((p, i) => {
+            const label = p.status === "failed"
+                ? `Page ${i + 1} · failed`
+                : `P${i + 1} · ${this._esc(psMeta(p.sheet_type).label)}`;
+            const rowCount = (p.rows || []).length;
+            const meta = p.status === "done" && rowCount ? `${rowCount} rows` : (p.status === "failed" ? "" : "");
+            const active = p.id === this.state.activePageId ? "active" : "";
+            const retry = p.status === "failed"
+                ? `<button class="ps-page-retry" onclick="event.stopPropagation(); productionSheets.retryPage('${p.id}')">↻ Retry</button>`
+                : "";
+            items.push(`
+                <div class="ps-page-item ${active} ${p.status}" onclick="productionSheets.switchPage('${p.id}')">
+                    ${this._statusDot(p.status)}
+                    <span class="ps-page-item-label">${label}</span>
+                    <span class="ps-page-item-meta">${meta}</span>
+                    ${retry}
+                </div>
+            `);
+        });
+
+        // Pending jobs (queued / mid-extraction with no page yet) as ghost rows.
+        for (const job of this.state.jobs) {
+            const jobPages = pages.filter(p => p.jobId === job.id).length;
+            const expected = job.totalPages || 0;
+            const remaining = job.status === "done" ? 0
+                : Math.max(expected - jobPages, (job.status === "extracting" || job.status === "queued") && expected === 0 ? 1 : 0);
+            for (let k = 0; k < remaining; k++) {
+                const st = job.status === "extracting" ? "extracting" : "queued";
+                items.push(`
+                    <div class="ps-page-item ${st} ghost">
+                        ${this._statusDot(st)}
+                        <span class="ps-page-item-label">${this._esc(job.file.name)}</span>
+                        <span class="ps-page-item-meta">${st === "extracting" ? "extracting…" : "queued"}</span>
+                    </div>
+                `);
+            }
+        }
+
+        wrap.innerHTML = items.join("") || `<p style="color:#64748b;padding:0.5rem;">No pages yet.</p>`;
+    }
+
+    switchPage(id) {
+        this.state.activePageId = id;
         this._renderTabs();
         this._renderActivePage();
     }
 
+    _activePage() {
+        return this.state.pages.find(p => p.id === this.state.activePageId) || null;
+    }
+
+    /** Re-run extraction for a single failed page's source file. */
+    async retryPage(pageId) {
+        const page = this.state.pages.find(p => p.id === pageId);
+        if (!page) return;
+        const job = this.state.jobs.find(j => j.id === page.jobId);
+        if (!job) return;
+
+        // Drop the failed page(s) for this job; the stream will re-add them.
+        this.state.pages = this.state.pages.filter(p => p.jobId !== job.id);
+        if (!this.state.pages.some(p => p.id === this.state.activePageId)) {
+            this.state.activePageId = this.state.pages[0]?.id || null;
+        }
+        this._renderTabs();
+        this._renderActivePage();
+        await this._runJob(job);
+    }
+
     _renderActivePage() {
-        const pages = this.state.allPages || [];
-        const page = pages[this.state.activePageIndex];
+        const page = this._activePage();
         if (!page) {
-            document.getElementById("ps-image-viewer").innerHTML = `<p style="color:#64748b;text-align:center;padding:2rem;">No page to display.</p>`;
+            document.getElementById("ps-image-viewer").innerHTML = `<p style="color:#64748b;text-align:center;padding:2rem;">No page selected.</p>`;
             document.getElementById("ps-thead").innerHTML = "";
             document.getElementById("ps-tbody").innerHTML = "";
             document.getElementById("ps-date-input").value = "";
@@ -258,9 +440,13 @@ class ProductionSheetsModule {
 
         // Image
         const viewer = document.getElementById("ps-image-viewer");
-        viewer.innerHTML = page.image_url
-            ? `<img src="${page.image_url}" alt="Page ${this.state.activePageIndex + 1}" />`
-            : `<p style="color:#64748b;text-align:center;padding:2rem;">No image available.</p>`;
+        if (page.status === "failed") {
+            viewer.innerHTML = `<p style="color:#f87171;text-align:center;padding:2rem;">⚠️ Extraction failed for this page.<br><span style="color:#94a3b8;font-size:0.85rem;">${this._esc(page.error || "")}</span></p>`;
+        } else {
+            viewer.innerHTML = page.image_url
+                ? `<img src="${page.image_url}" alt="${this._esc(page.fileName)}" />`
+                : `<p style="color:#64748b;text-align:center;padding:2rem;">No image available.</p>`;
+        }
 
         // Sheet type + DATE
         const type = page.sheet_type || PS_DEFAULT_TYPE;
@@ -286,7 +472,7 @@ class ProductionSheetsModule {
     }
 
     onTypeEdit(val) {
-        const page = this.state.allPages?.[this.state.activePageIndex];
+        const page = this._activePage();
         if (!page || !PS_SHEET_TYPES[val]) return;
         const meta = psMeta(val);
         page.sheet_type = val;
@@ -298,12 +484,12 @@ class ProductionSheetsModule {
     }
 
     onDateEdit(val) {
-        const page = this.state.allPages?.[this.state.activePageIndex];
+        const page = this._activePage();
         if (page) page.date = val;
     }
 
     onShiftEdit(val) {
-        const page = this.state.allPages?.[this.state.activePageIndex];
+        const page = this._activePage();
         if (page) {
             const sh = (val || "").toUpperCase();
             page.shift = (sh === "DAY" || sh === "NIGHT") ? sh : "";
@@ -311,33 +497,33 @@ class ProductionSheetsModule {
     }
 
     onCellEdit(rowIdx, col, val) {
-        const page = this.state.allPages?.[this.state.activePageIndex];
+        const page = this._activePage();
         if (page && page.rows && page.rows[rowIdx]) {
             page.rows[rowIdx][col] = val.trim();
         }
     }
 
     addRow() {
-        const page = this.state.allPages?.[this.state.activePageIndex];
+        const page = this._activePage();
         if (!page) return;
         page.rows = page.rows || [];
         const empty = {};
         for (const c of PS_COLUMNS) empty[c] = "";
         page.rows.push(empty);
         this._renderActivePage();
-        document.getElementById("ps-row-count").textContent = this.state.allPages.reduce((s, p) => s + (p.rows || []).length, 0);
+        this._updateStats();
     }
 
     deleteRow(rowIdx) {
-        const page = this.state.allPages?.[this.state.activePageIndex];
+        const page = this._activePage();
         if (!page || !page.rows) return;
         page.rows.splice(rowIdx, 1);
         this._renderActivePage();
-        document.getElementById("ps-row-count").textContent = this.state.allPages.reduce((s, p) => s + (p.rows || []).length, 0);
+        this._updateStats();
     }
 
     copyTable() {
-        const page = this.state.allPages?.[this.state.activePageIndex];
+        const page = this._activePage();
         if (!page) return;
         const teamHeader = psMeta(page.sheet_type).team_header;
         const headerLine = PS_COLUMNS.map(c => c === "TeamCode" ? teamHeader : c);
@@ -351,9 +537,10 @@ class ProductionSheetsModule {
     }
 
     async exportExcel() {
-        const pages = this.state.allPages || [];
+        // Only export successfully-extracted pages, in display order.
+        const pages = (this.state.pages || []).filter(p => p.status === "done");
         if (!pages.length) {
-            alert("Nothing to export.");
+            alert("Nothing to export yet.");
             return;
         }
         const payload = {
@@ -396,7 +583,6 @@ class ProductionSheetsModule {
     _show() { document.getElementById("ps-overlay").classList.add("active"); }
     close() { document.getElementById("ps-overlay").classList.remove("active"); }
     _setSubtitle(t) { document.getElementById("ps-subtitle").textContent = t; }
-    _setLoading(on) { document.getElementById("ps-loading").style.display = on ? "flex" : "none"; }
 
     _getToken() {
         return localStorage.getItem("token") ||

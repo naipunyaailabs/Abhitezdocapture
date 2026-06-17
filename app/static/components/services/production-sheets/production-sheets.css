@@ -42,6 +42,19 @@
 .ps-title { color: #f1f5f9; font-size: 1.2rem; font-weight: 700; margin: 0; }
 .ps-title span { color: #14b8a6; }
 .ps-subtitle { color: #94a3b8; font-size: 0.85rem; margin: 0.15rem 0 0 0; }
+
+/* Thin batch progress bar under the header. */
+.ps-progress-track {
+    height: 3px;
+    background: rgba(255,255,255,0.06);
+    overflow: hidden;
+}
+.ps-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #14b8a6, #0d9488);
+    transition: width 0.3s ease;
+}
 .ps-header-right { display: flex; gap: 0.5rem; }
 .ps-btn-export {
     background: linear-gradient(135deg, #14b8a6, #0d9488);
@@ -81,28 +94,87 @@
     font-size: 0.85rem;
     font-weight: 600;
     margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.ps-page-counter {
+    color: #64748b;
+    font-size: 0.72rem;
+    font-weight: 500;
 }
 
-.ps-page-tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
+/* Scrollable vertical page list — scales cleanly to 50+ pages. */
+.ps-page-list {
+    max-height: 168px;
+    overflow-y: auto;
     margin-bottom: 0.5rem;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px;
+    background: #0b1220;
+    padding: 0.25rem;
 }
-.ps-tab {
-    padding: 0.3rem 0.7rem;
-    background: rgba(255,255,255,0.04);
-    color: #94a3b8;
-    border: 1px solid rgba(255,255,255,0.08);
+.ps-page-list::-webkit-scrollbar { width: 8px; }
+.ps-page-list::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.12);
+    border-radius: 4px;
+}
+
+.ps-page-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.6rem;
     border-radius: 6px;
-    font-size: 0.78rem;
     cursor: pointer;
+    font-size: 0.78rem;
+    color: #94a3b8;
+    border: 1px solid transparent;
+    transition: background 0.15s ease;
 }
-.ps-tab.active {
+.ps-page-item:hover { background: rgba(255,255,255,0.04); }
+.ps-page-item.active {
     background: rgba(20, 184, 166, 0.18);
     color: #14b8a6;
     border-color: rgba(20, 184, 166, 0.4);
 }
+.ps-page-item.ghost { opacity: 0.6; cursor: default; }
+.ps-page-item.ghost:hover { background: transparent; }
+.ps-page-item-label {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ps-page-item-meta { color: #64748b; font-size: 0.72rem; flex-shrink: 0; }
+
+/* Per-page status dot. */
+.ps-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: inline-block;
+}
+.ps-dot.ok      { background: #14b8a6; }
+.ps-dot.fail    { background: #ef4444; }
+.ps-dot.queued  { background: #475569; }
+.ps-dot.running {
+    background: #f59e0b;
+    animation: ps-pulse 1s ease-in-out infinite;
+}
+@keyframes ps-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+.ps-page-retry {
+    background: rgba(239,68,68,0.15);
+    color: #f87171;
+    border: 1px solid rgba(239,68,68,0.35);
+    border-radius: 5px;
+    font-size: 0.7rem;
+    padding: 0.15rem 0.45rem;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.ps-page-retry:hover { background: rgba(239,68,68,0.25); }
 
 .ps-image-viewer {
     flex: 1;
@@ -229,29 +301,6 @@
     color: #94a3b8;
 }
 .ps-stat span { color: #f1f5f9; font-weight: 600; }
-
-.ps-loading {
-    position: absolute;
-    inset: 0;
-    background: rgba(15, 23, 42, 0.85);
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.6rem;
-    z-index: 10;
-}
-.ps-spinner {
-    width: 48px;
-    height: 48px;
-    border: 4px solid rgba(20,184,166,0.2);
-    border-top-color: #14b8a6;
-    border-radius: 50%;
-    animation: ps-spin 0.8s linear infinite;
-}
-@keyframes ps-spin { to { transform: rotate(360deg); } }
-.ps-loading-text { color: #f1f5f9; font-weight: 600; }
-.ps-loading-sub { color: #94a3b8; font-size: 0.85rem; }
 
 @media (max-width: 1100px) {
     .ps-main { grid-template-columns: 1fr; }
