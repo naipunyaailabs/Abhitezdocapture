@@ -1,13 +1,14 @@
 """Admin API — all endpoints require an admin account (allowlist or role=admin)."""
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, EmailStr
 
 from app.utils.auth import require_admin
 from app.models.user import UserResponse
 from app.services.admin_service import admin_service
 from app.services.email_service import email_service
+from app.services.service_registry import SERVICES, normalize_allowed
 
 router = APIRouter()
 
@@ -35,6 +36,11 @@ class StatusUpdate(BaseModel):
     status: str  # "active" | "blocked"
 
 
+class ServicesUpdate(BaseModel):
+    # null = allow ALL services; a list = allow only those service ids.
+    allowedServices: Optional[List[str]] = None
+
+
 class ProfileUpdate(BaseModel):
     name: Optional[str] = None
     email: Optional[EmailStr] = None
@@ -49,6 +55,12 @@ async def list_users(_: UserResponse = Depends(require_admin)):
     metrics = await admin_service.list_user_metrics()
     totals = await admin_service.get_totals(metrics)
     return {"users": metrics, "totals": totals}
+
+
+@router.get("/services")
+async def list_available_services(_: UserResponse = Depends(require_admin)):
+    """The catalog of gateable services for the per-user access UI."""
+    return {"services": SERVICES}
 
 
 @router.post("/users", status_code=201)
@@ -101,6 +113,17 @@ async def update_role(user_id: str, body: RoleUpdate,
     if not ok:
         raise HTTPException(status_code=404, detail="User not found")
     return {"message": "Role updated"}
+
+
+@router.put("/users/{user_id}/services")
+async def update_allowed_services(user_id: str, body: ServicesUpdate,
+                                  _: UserResponse = Depends(require_admin)):
+    """Set which services a user may see/use. allowedServices=null → all."""
+    allowed = normalize_allowed(body.allowedServices)
+    ok = await admin_service.set_allowed_services(user_id, allowed)
+    if not ok:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"message": "Service access updated", "allowedServices": allowed}
 
 
 @router.put("/users/{user_id}/status")

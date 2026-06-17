@@ -65,3 +65,33 @@ async def require_admin(current_user: UserResponse = Depends(get_current_user)) 
     if not user_is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
+
+
+def require_service(service_id: str):
+    """Build a dependency that enforces per-user service access for `service_id`.
+
+    Admins always pass. For a normal user, the account's `allowedServices` (None
+    = all allowed) must include `service_id`, otherwise a 403 is raised. This is
+    the server-side counterpart to the dashboard card gating, so a restricted
+    user cannot reach an endpoint by calling the API directly.
+    """
+    async def _dep(current_user: UserResponse = Depends(get_current_user)) -> UserResponse:
+        if user_is_admin(current_user):
+            return current_user
+        from app.services.service_registry import is_service_allowed
+        from app.database import get_database
+        allowed = None
+        db = await get_database()
+        if db is not None:
+            doc = await db.users.find_one(
+                {"userId": current_user.userId}, {"allowedServices": 1}
+            )
+            allowed = (doc or {}).get("allowedServices")
+        if not is_service_allowed(allowed, service_id):
+            raise HTTPException(
+                status_code=403,
+                detail="This service is not enabled for your account. "
+                       "Please contact your administrator.",
+            )
+        return current_user
+    return _dep

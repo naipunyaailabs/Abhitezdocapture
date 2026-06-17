@@ -7,7 +7,10 @@ import openpyxl
 from app.services.extract_iq.extract_iq_service import extract_iq_service
 from app.services.subscription_service import subscription_service
 from app.services.history_service import history_service
-from app.utils.auth import get_current_user
+from app.utils.auth import get_current_user, require_service
+
+# Per-user access guard for this service (admins bypass; None = all allowed).
+require_svc = require_service("extract-iq")
 from app.models.user import UserResponse
 
 router = APIRouter()
@@ -17,7 +20,7 @@ router = APIRouter()
 async def extract_iq_process(
     document: UploadFile = File(...),
     fields: str = Form(...),
-    current_user: UserResponse = Depends(get_current_user)
+    current_user: UserResponse = Depends(require_svc)
 ):
     """
     Extract handwritten & printed data from documents using user-defined fields.
@@ -95,7 +98,7 @@ async def extract_iq_process(
 @router.post("/export")
 async def export_extract_iq(
     data: dict,
-    current_user: UserResponse = Depends(get_current_user)
+    current_user: UserResponse = Depends(require_svc)
 ):
     """
     Exports all validated records to Excel.

@@ -31,8 +31,11 @@
     <p style="color: var(--text-muted); font-size: 1rem;">Upload documents and leverage AI to extract intelligence.</p>
 </div>
 
+{# Per-user service gating: allowed_services is None (all) or a list of ids. #}
+{% set _allowed = allowed_services %}
+
 <div class="dash-services-grid">
-    <!-- Smart Summary 
+    <!-- Smart Summary
     <div class="dash-service-card">
         ...
     </div>
@@ -46,7 +49,8 @@
 
 
     <!-- Invoice Extraction (formerly DataMatrix / Deep Parse) -->
-    <div class="dash-service-card">
+    {% if _allowed is none or 'invoice-extraction' in _allowed %}
+    <div class="dash-service-card" data-service-id="invoice-extraction">
         <div class="dsc-header">
             <div class="dsc-icon" style="background: rgba(34, 197, 94, 0.15);">🔍</div>
             <div>
@@ -79,12 +83,14 @@
             <button type="submit" class="btn-premium btn-primary" style="width: 100%;">Analyze Multi-Page PDF</button>
         </form>
     </div>
+    {% endif %}
 
 
 
 
     <!-- ExtractIQ -->
-    <div class="dash-service-card eiq-card">
+    {% if _allowed is none or 'extract-iq' in _allowed %}
+    <div class="dash-service-card eiq-card" data-service-id="extract-iq">
         <div class="dsc-header">
             <div class="dsc-icon" style="background: rgba(251, 191, 36, 0.15);">🧠</div>
             <div>
@@ -123,11 +129,13 @@
                 Extract</button>
         </form>
     </div>
+    {% endif %}
 
 
 
     <!-- Abhitex Register Extractor -->
-    <div class="dash-service-card reg-card">
+    {% if _allowed is none or 'register-extractor' in _allowed %}
+    <div class="dash-service-card reg-card" data-service-id="register-extractor">
         <div class="dsc-header">
             <div class="dsc-icon" style="background: rgba(251, 191, 36, 0.15);">📒</div>
             <div>
@@ -162,10 +170,12 @@
                 style="width: 100%;">📒 Pick Template &amp; Extract</button>
         </form>
     </div>
+    {% endif %}
 
 
     <!-- Waste & Downgrade -->
-    <div class="dash-service-card wd-card">
+    {% if _allowed is none or 'waste-downgrade' in _allowed %}
+    <div class="dash-service-card wd-card" data-service-id="waste-downgrade">
         <div class="dsc-header">
             <div class="dsc-icon" style="background: rgba(34, 197, 94, 0.15);">♻️</div>
             <div>
@@ -200,10 +210,12 @@
                 style="width: 100%; background: linear-gradient(135deg, #22c55e, #16a34a); color: #fff;">♻️ Extract Waste &amp; Downgrade</button>
         </form>
     </div>
+    {% endif %}
 
 
     <!-- Lot History Cards Extraction -->
-    <div class="dash-service-card lhc-card">
+    {% if _allowed is none or 'lot-history-cards' in _allowed %}
+    <div class="dash-service-card lhc-card" data-service-id="lot-history-cards">
         <div class="dsc-header">
             <div class="dsc-icon" style="background: rgba(99, 102, 241, 0.15);">🧵</div>
             <div>
@@ -238,10 +250,12 @@
                 style="width: 100%; background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff;">🧵 Extract Lot History Cards</button>
         </form>
     </div>
+    {% endif %}
 
 
     <!-- Production Sheets -->
-    <div class="dash-service-card ps-card">
+    {% if _allowed is none or 'production-sheets' in _allowed %}
+    <div class="dash-service-card ps-card" data-service-id="production-sheets">
         <div class="dsc-header">
             <div class="dsc-icon" style="background: rgba(20, 184, 166, 0.15);">🧾</div>
             <div>
@@ -276,6 +290,14 @@
                 style="width: 100%; background: linear-gradient(135deg, #14b8a6, #0d9488); color: #fff;">🧾 Extract Production Sheets</button>
         </form>
     </div>
+    {% endif %}
+
+    {% if _allowed is not none and _allowed|length == 0 %}
+    <div class="dash-service-card" style="grid-column: 1 / -1; text-align:center;">
+        <h3 style="margin:0 0 0.5rem;">No services enabled</h3>
+        <p style="margin:0;">Your account doesn't have any services enabled yet. Please contact your administrator.</p>
+    </div>
+    {% endif %}
 
 
     <!-- RFP Forge

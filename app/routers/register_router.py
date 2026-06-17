@@ -25,8 +25,12 @@ from app.services.register_extractor.export_engine import export_register_data
 from app.services.register_extractor.user_template_service import user_template_service
 from app.services.subscription_service import subscription_service
 from app.services.history_service import history_service
-from app.utils.auth import get_current_user
+from app.utils.auth import get_current_user, require_service
 from app.models.user import UserResponse
+
+# Per-user access guard for this service (admins bypass; None = all allowed).
+# Applied to extract/export only — template CRUD stays available to any user.
+require_reg = require_service("register-extractor")
 
 router = APIRouter()
 
@@ -78,7 +82,7 @@ class ExportRequest(BaseModel):
 async def register_extract(
     document: UploadFile = File(...),
     user_template_id: str = Form(...),
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(require_reg),
 ):
     """
     Extract tabular data from a register document using a saved user template.
@@ -143,7 +147,7 @@ async def register_extract(
 @router.post("/export")
 async def register_export(
     body: ExportRequest,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(require_reg),
 ):
     if not body.rows or not body.headers:
         raise HTTPException(400, "rows and headers are required.")

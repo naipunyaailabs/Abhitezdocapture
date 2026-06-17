@@ -85,6 +85,8 @@ class AdminService:
                 "filesExtracted": files_by_user.get(uid, 0),
                 "services": services_map,
                 "servicesCount": len(services_map),
+                # Per-user service access (None = all services allowed).
+                "allowedServices": u.get("allowedServices"),
                 # tokens (this calendar month)
                 "tokensThisMonth": _to_int(usage.get("totalTokens")),
                 "callsThisMonth": _to_int(usage.get("calls")),
@@ -185,6 +187,18 @@ class AdminService:
         if db is None:
             return False
         res = await db.users.update_one({"userId": user_id}, {"$set": {"role": role}})
+        return res.matched_count > 0
+
+    async def set_allowed_services(self, user_id: str,
+                                   allowed: Optional[List[str]]) -> bool:
+        """Set which services a user may see/use. `allowed=None` means ALL
+        services (stored as null); a list restricts to exactly those ids."""
+        db = await get_database()
+        if db is None:
+            return False
+        res = await db.users.update_one(
+            {"userId": user_id}, {"$set": {"allowedServices": allowed}}
+        )
         return res.matched_count > 0
 
     # ── User management ────────────────────────────────────────────────────

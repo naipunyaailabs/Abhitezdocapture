@@ -29,8 +29,11 @@ from app.services.production_sheets.production_sheets_service import (
 )
 from app.services.subscription_service import subscription_service
 from app.services.history_service import history_service
-from app.utils.auth import get_current_user
+from app.utils.auth import get_current_user, require_service
 from app.models.user import UserResponse
+
+# Per-user access guard for this service (admins bypass; None = all allowed).
+require_ps = require_service("production-sheets")
 
 
 router = APIRouter()
@@ -62,7 +65,7 @@ class ExportRequest(BaseModel):
 @router.post("/extract")
 async def production_sheets_extract(
     document: UploadFile = File(...),
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(require_ps),
 ):
     buffer = await document.read()
     _validate_file(document.filename, len(buffer))
@@ -104,7 +107,7 @@ async def production_sheets_extract(
 @router.post("/extract-streaming")
 async def production_sheets_extract_streaming(
     document: UploadFile = File(...),
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(require_ps),
 ):
     """Extract and stream results as each page completes (JSONL)."""
     buffer = await document.read()
@@ -237,7 +240,7 @@ def _write_sheet(ws, page: Dict[str, Any]):
 @router.post("/export")
 async def production_sheets_export(
     body: ExportRequest,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(require_ps),
 ):
     """Export extracted data preserving the source sheet layout, one worksheet
     per extracted page. The worksheet is named after the detected sheet type so

@@ -7,7 +7,10 @@ import openpyxl
 from app.services.deep_parse.deep_parse_service import deep_parse_service
 from app.services.subscription_service import subscription_service
 from app.services.history_service import history_service
-from app.utils.auth import get_current_user
+from app.utils.auth import get_current_user, require_service
+
+# Per-user access guard for this service (admins bypass; None = all allowed).
+require_svc = require_service("invoice-extraction")
 from app.models.user import UserResponse
 
 router = APIRouter()
@@ -15,7 +18,7 @@ router = APIRouter()
 @router.post("/extract")
 async def extract_deep_parse(
     document: UploadFile = File(...),
-    current_user: UserResponse = Depends(get_current_user)
+    current_user: UserResponse = Depends(require_svc)
 ):
     try:
         # Check if user can process
@@ -62,7 +65,7 @@ async def extract_deep_parse(
 @router.post("/export")
 async def export_deep_parse(
     data: dict,
-    current_user: UserResponse = Depends(get_current_user)
+    current_user: UserResponse = Depends(require_svc)
 ):
     """
     Exports all validated records to Excel.

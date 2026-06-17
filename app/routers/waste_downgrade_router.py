@@ -26,7 +26,10 @@ from app.services.waste_downgrade.waste_downgrade_service import (
 )
 from app.services.subscription_service import subscription_service
 from app.services.history_service import history_service
-from app.utils.auth import get_current_user
+from app.utils.auth import get_current_user, require_service
+
+# Per-user access guard for this service (admins bypass; None = all allowed).
+require_svc = require_service("waste-downgrade")
 from app.models.user import UserResponse
 
 
@@ -56,7 +59,7 @@ class ExportRequest(BaseModel):
 @router.post("/extract")
 async def waste_downgrade_extract(
     document: UploadFile = File(...),
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(require_svc),
 ):
     buffer = await document.read()
     _validate_file(document.filename, len(buffer))
@@ -99,7 +102,7 @@ async def waste_downgrade_extract(
 @router.post("/extract-streaming")
 async def waste_downgrade_extract_streaming(
     document: UploadFile = File(...),
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(require_svc),
 ):
     """
     Extract and stream results as each page completes.
@@ -153,7 +156,7 @@ async def waste_downgrade_extract_streaming(
 @router.post("/export")
 async def waste_downgrade_export(
     body: ExportRequest,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(require_svc),
 ):
     """Export extracted data preserving the source sheet layout:
         Row 1: DATE | <page date>

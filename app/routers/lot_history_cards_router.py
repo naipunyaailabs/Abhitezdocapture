@@ -27,7 +27,10 @@ from app.services.lot_history_cards.lot_history_cards_service import (
 )
 from app.services.subscription_service import subscription_service
 from app.services.history_service import history_service
-from app.utils.auth import get_current_user
+from app.utils.auth import get_current_user, require_service
+
+# Per-user access guard for this service (admins bypass; None = all allowed).
+require_svc = require_service("lot-history-cards")
 from app.models.user import UserResponse
 
 
@@ -57,7 +60,7 @@ class ExportRequest(BaseModel):
 @router.post("/extract")
 async def lot_history_cards_extract(
     document: UploadFile = File(...),
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(require_svc),
 ):
     buffer = await document.read()
     _validate_file(document.filename, len(buffer))
@@ -110,7 +113,7 @@ def _flat_columns() -> List[str]:
 @router.post("/export")
 async def lot_history_cards_export(
     body: ExportRequest,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(require_svc),
 ):
     """Export extracted cards.
 

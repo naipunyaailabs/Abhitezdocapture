@@ -279,6 +279,19 @@ async def dashboard_services_page(request: Request):
     ctx = await get_dashboard_context(request, "services")
     if not ctx:
         return RedirectResponse("/?login=true", status_code=302)
+
+    # Per-user service gating. Admins always see everything. For a normal user,
+    # `allowedServices == None` (default) means all are allowed; a list limits
+    # the cards rendered. `None` in the template = no restriction.
+    allowed = None
+    if not ctx.get("is_admin"):
+        db_conn = await get_database()
+        if db_conn is not None:
+            user_doc = await db_conn.users.find_one(
+                {"userId": ctx["current_user"].userId}, {"allowedServices": 1}
+            )
+            allowed = (user_doc or {}).get("allowedServices")
+    ctx["allowed_services"] = allowed
     return templates.TemplateResponse(request, "dashboard_services.html", ctx)
 
 
