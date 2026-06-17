@@ -32,9 +32,12 @@ const PS_SHEET_TYPES = {
 };
 const PS_DEFAULT_TYPE = "length_heming";
 
-// How many files to extract concurrently. Bounded so the server/LLM is not
-// overwhelmed when many files are uploaded at once.
-const PS_CONCURRENCY = 4;
+// How many files to extract concurrently. Kept at 1 (strictly sequential):
+// each file extraction already fires multiple vision calls (detect + date +
+// N voting passes) on the backend, so running files in parallel overwhelmed
+// the LLM API — rows came back empty while the lighter date/shift call still
+// succeeded. Sequential is reliable and matches the original working behavior.
+const PS_CONCURRENCY = 1;
 
 function psMeta(type) {
     return PS_SHEET_TYPES[type] || PS_SHEET_TYPES[PS_DEFAULT_TYPE];
@@ -307,8 +310,13 @@ class ProductionSheetsModule {
             sub.textContent = failed
                 ? `${done}/${total} file(s) done · ${failed} failed · ${okPages} page(s) extracted`
                 : `✅ ${total} file(s), ${okPages} page(s) completed`;
+        } else if (running > 0) {
+            // Sequential mode: name the file currently being read.
+            const current = jobs.find(j => j.status === "extracting");
+            const name = current ? current.file.name : "";
+            sub.textContent = `Extracting ${finished + 1}/${total}: ${name} …`;
         } else {
-            sub.textContent = `Extracting… ${finished}/${total} file(s) done · ${running} running`;
+            sub.textContent = `Preparing ${total} file(s)…`;
         }
 
         // Progress bar.
@@ -353,50 +361,41 @@ class ProductionSheetsModule {
         const wrap = document.getElementById("ps-page-tabs");
         const pages = this.state.pages || [];
 
-        // Rows already shown for completed pages, plus placeholder rows for the
-        // pages still extracting / queued (so the user sees the full pipeline).
+        // Horizontal tab strip: P1 · P2 · P3 … in extraction order, each with a
+        // status dot. Failed tabs carry an inline retry. A single trailing
+        // "extracting…" ghost tab shows the pipeline is still working.
         const items = [];
 
-        // Completed/extracted/failed pages.
         pages.forEach((p, i) => {
             const label = p.status === "failed"
-                ? `Page ${i + 1} · failed`
+                ? `P${i + 1} · failed`
                 : `P${i + 1} · ${this._esc(psMeta(p.sheet_type).label)}`;
-            const rowCount = (p.rows || []).length;
-            const meta = p.status === "done" && rowCount ? `${rowCount} rows` : (p.status === "failed" ? "" : "");
             const active = p.id === this.state.activePageId ? "active" : "";
             const retry = p.status === "failed"
-                ? `<button class="ps-page-retry" onclick="event.stopPropagation(); productionSheets.retryPage('${p.id}')">↻ Retry</button>`
+                ? `<button class="ps-tab-retry" title="Retry this page" onclick="event.stopPropagation(); productionSheets.retryPage('${p.id}')">↻</button>`
                 : "";
             items.push(`
-                <div class="ps-page-item ${active} ${p.status}" onclick="productionSheets.switchPage('${p.id}')">
-                    ${this._statusDot(p.status)}
-                    <span class="ps-page-item-label">${label}</span>
-                    <span class="ps-page-item-meta">${meta}</span>
-                    ${retry}
-                </div>
+                <button class="ps-tab ${active} ${p.status}" data-page-id="${p.id}" onclick="productionSheets.switchPage('${p.id}')">
+                    ${this._statusDot(p.status)}<span class="ps-tab-label">${label}</span>${retry}
+                </button>
             `);
         });
 
-        // Pending jobs (queued / mid-extraction with no page yet) as ghost rows.
-        for (const job of this.state.jobs) {
-            const jobPages = pages.filter(p => p.jobId === job.id).length;
-            const expected = job.totalPages || 0;
-            const remaining = job.status === "done" ? 0
-                : Math.max(expected - jobPages, (job.status === "extracting" || job.status === "queued") && expected === 0 ? 1 : 0);
-            for (let k = 0; k < remaining; k++) {
-                const st = job.status === "extracting" ? "extracting" : "queued";
-                items.push(`
-                    <div class="ps-page-item ${st} ghost">
-                        ${this._statusDot(st)}
-                        <span class="ps-page-item-label">${this._esc(job.file.name)}</span>
-                        <span class="ps-page-item-meta">${st === "extracting" ? "extracting…" : "queued"}</span>
-                    </div>
-                `);
-            }
+        // One trailing ghost tab while any file is still queued/extracting.
+        const pending = this.state.jobs.some(j => j.status === "queued" || j.status === "extracting");
+        if (pending) {
+            items.push(`
+                <span class="ps-tab ghost extracting">
+                    ${this._statusDot("extracting")}<span class="ps-tab-label">extracting…</span>
+                </span>
+            `);
         }
 
-        wrap.innerHTML = items.join("") || `<p style="color:#64748b;padding:0.5rem;">No pages yet.</p>`;
+        wrap.innerHTML = items.join("") || `<p style="color:#64748b;padding:0.4rem 0.5rem;">No pages yet.</p>`;
+
+        // Keep the active tab visible as the strip grows past the viewport.
+        const activeEl = wrap.querySelector(".ps-tab.active");
+        if (activeEl) activeEl.scrollIntoView({ inline: "nearest", block: "nearest" });
     }
 
     switchPage(id) {

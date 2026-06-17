@@ -104,49 +104,60 @@
     font-weight: 500;
 }
 
-/* Scrollable vertical page list — scales cleanly to 50+ pages. */
+/* Horizontal page tab strip — P1 · P2 · P3 … scrolls sideways for 50+ pages. */
 .ps-page-list {
-    max-height: 168px;
-    overflow-y: auto;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.3rem;
+    overflow-x: auto;
+    overflow-y: hidden;
     margin-bottom: 0.5rem;
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 8px;
-    background: #0b1220;
-    padding: 0.25rem;
+    padding: 0.25rem 0.1rem 0.4rem;
 }
-.ps-page-list::-webkit-scrollbar { width: 8px; }
+.ps-page-list::-webkit-scrollbar { height: 7px; }
 .ps-page-list::-webkit-scrollbar-thumb {
     background: rgba(255,255,255,0.12);
     border-radius: 4px;
 }
 
-.ps-page-item {
-    display: flex;
+.ps-tab {
+    display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.4rem 0.6rem;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.78rem;
+    gap: 0.4rem;
+    flex-shrink: 0;
+    padding: 0.35rem 0.7rem;
+    background: rgba(255,255,255,0.04);
     color: #94a3b8;
-    border: 1px solid transparent;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 7px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    white-space: nowrap;
+    font-family: inherit;
     transition: background 0.15s ease;
 }
-.ps-page-item:hover { background: rgba(255,255,255,0.04); }
-.ps-page-item.active {
+.ps-tab:hover { background: rgba(255,255,255,0.08); }
+.ps-tab.active {
     background: rgba(20, 184, 166, 0.18);
     color: #14b8a6;
     border-color: rgba(20, 184, 166, 0.4);
 }
-.ps-page-item.ghost { opacity: 0.6; cursor: default; }
-.ps-page-item.ghost:hover { background: transparent; }
-.ps-page-item-label {
-    flex: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+.ps-tab.failed { border-color: rgba(239,68,68,0.4); color: #f87171; }
+.ps-tab.ghost { opacity: 0.7; cursor: default; }
+.ps-tab.ghost:hover { background: rgba(255,255,255,0.04); }
+.ps-tab-label { white-space: nowrap; }
+
+.ps-tab-retry {
+    background: rgba(239,68,68,0.18);
+    color: #f87171;
+    border: 1px solid rgba(239,68,68,0.4);
+    border-radius: 5px;
+    font-size: 0.72rem;
+    line-height: 1;
+    padding: 0.1rem 0.35rem;
+    cursor: pointer;
 }
-.ps-page-item-meta { color: #64748b; font-size: 0.72rem; flex-shrink: 0; }
+.ps-tab-retry:hover { background: rgba(239,68,68,0.3); }
 
 /* Per-page status dot. */
 .ps-dot {
@@ -163,18 +174,6 @@
     animation: ps-pulse 1s ease-in-out infinite;
 }
 @keyframes ps-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
-
-.ps-page-retry {
-    background: rgba(239,68,68,0.15);
-    color: #f87171;
-    border: 1px solid rgba(239,68,68,0.35);
-    border-radius: 5px;
-    font-size: 0.7rem;
-    padding: 0.15rem 0.45rem;
-    cursor: pointer;
-    flex-shrink: 0;
-}
-.ps-page-retry:hover { background: rgba(239,68,68,0.25); }
 
 .ps-image-viewer {
     flex: 1;
